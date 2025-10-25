@@ -16,14 +16,42 @@
 </head>
 <body>
 
+<!-- Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('index') }}">Inventory Manager</a>
-        <div class="collapse navbar-collapse">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Hi, {{ current_user.username }}</a>
+                        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                    </li>
+
+                    <!-- New Products link -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('products') }}">Products</a>
+                    </li>
+
+                    {% if current_user.role in ['Admin / Owner', 'Warehouse Manager'] %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('warehouses') }}">Warehouses</a>
+                        </li>
+                    {% endif %}
+
+                    {% if current_user.role == 'Admin / Owner' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('partners') }}">Partners</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('users') }}">Users</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="nav-item">
+                        <a class="nav-link disabled">Hi, {{ current_user.username }}</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>

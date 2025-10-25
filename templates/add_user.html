@@ -1,46 +1,48 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <!-- Bootstrap CSS -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+{% extends "base.html" %}
 
-    <meta charset="UTF-8">
-    <title>Add User - Inventory Manager</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        input, select { margin-bottom: 10px; padding: 5px; width: 200px; }
-        button { padding: 5px 10px; }
-        .flash { color: red; margin-bottom: 10px; }
-    </style>
-</head>
+{% block title %}Add User{% endblock %}
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block content %}
+<div class="container mt-4">
+    <h3>Add New User</h3>
 
-<body>
-
-    <h1>Add User</h1>
-
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <div class="flash">
-                {% for msg in messages %}
-                    <p>{{ msg }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
+      {% if messages %}
+        <div class="alert alert-danger mt-2">
+          {% for msg in messages %}
+            <div>{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('add_user') }}">
-        <input type="text" name="username" placeholder="Username" required><br>
-        <input type="password" name="password" placeholder="Password" required><br>
-        <label for="role">Role:</label>
-        <select name="role" required>
-            <option value="Admin / Owner">Admin / Owner</option>
-            <option value="Warehouse Manager">Warehouse Manager</option>
-            <option value="Sales Agent">Sales Agent</option>
-        </select><br>
-        <button type="submit">Add User</button>
-    </form>
-</body>
-</html>
+    <!-- Add User Form Card -->
+    <div class="card shadow-sm mt-3 mb-4">
+        <div class="card-header bg-primary text-white">
+            User Details
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_user') }}" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="username" placeholder="Username" required>
+                </div>
+                <div class="col-md-4">
+                    <input type="password" class="form-control" name="password" placeholder="Password" required>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" name="role" required>
+                        <option value="Admin / Owner">Admin / Owner</option>
+                        <option value="Warehouse Manager">Warehouse Manager</option>
+                        <option value="Sales Agent">Sales Agent</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">Add User</button>
+                    <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">Back to Users</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
