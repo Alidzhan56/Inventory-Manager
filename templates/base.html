@@ -4,79 +4,150 @@
     <meta charset="UTF-8">
     <title>{% block title %}Inventory Manager{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
     <style>
         body {
-            padding-top: 60px;
             background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
         }
-        .nav-link.active {
-            font-weight: bold;
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 56px; /* height of navbar */
+            left: 0;
+            height: calc(100% - 56px);
+            width: 220px;
+            background-color: #212529;
+            color: white;
+            padding-top: 1rem;
+        }
+        .sidebar a {
+            color: #adb5bd;
+            display: block;
+            padding: 10px 15px;
+            text-decoration: none;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #495057;
+            color: #fff;
+        }
+        /* Main content */
+        .main-content {
+            margin-left: 220px;
+            padding: 20px;
+            margin-top: 56px;
+        }
+        .navbar-brand img {
+            height: 32px;
+            margin-right: 10px;
+        }
+        .dropdown-menu-end {
+            right: 0;
+            left: auto;
         }
     </style>
 </head>
 <body>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+<!-- 🧭 Top Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('index') }}">Inventory Manager</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                {% if current_user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
-                    </li>
 
-                    <!-- New Products link -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('products') }}">Products</a>
-                    </li>
+        <!-- 🏢 Company Logo and Name -->
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+            {% if g.app_config.logo_path %}
+                <img src="{{ url_for('static', filename=g.app_config.logo_path.split('static/')[-1]) }}" 
+                     alt="Logo" height="40" class="me-2 rounded">
+            {% else %}
+                <img src="{{ url_for('static', filename='default-logo.png') }}" 
+                     alt="Logo" height="40" class="me-2 rounded">
+            {% endif %}
+            <span class="fw-bold">{{ g.app_config.company_name or "Inventory Manager" }}</span>
+        </a>
 
-                    {% if current_user.role in ['Admin / Owner', 'Warehouse Manager'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('warehouses') }}">Warehouses</a>
-                        </li>
-                    {% endif %}
+        <!-- 🔔 Notifications + User Menu -->
+        <div class="d-flex align-items-center ms-auto">
+            
+            <!-- Notifications Icon -->
+            {% if g.app_config.notifications_enabled %}
+            <a href="#" class="nav-link text-light me-3">
+                <i class="bi bi-bell-fill fs-5"></i>
+            </a>
+            {% endif %}
 
+            <!-- 👤 User Dropdown -->
+            {% if current_user.is_authenticated %}
+            <div class="dropdown">
+                <a class="nav-link dropdown-toggle text-light d-flex align-items-center" href="#" 
+                   id="userDropdown" role="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-person-circle fs-5 me-1"></i> 
+                    <span>{{ current_user.username }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="#">Profile</a></li>
                     {% if current_user.role == 'Admin / Owner' %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('partners') }}">Partners</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('users') }}">Users</a>
-                        </li>
+                    <li><a class="dropdown-item" href="{{ url_for('settings') }}">Settings</a></li>
                     {% endif %}
-
-                    <li class="nav-item">
-                        <a class="nav-link disabled">Hi, {{ current_user.username }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-                    </li>
-                {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('login') }}">Login</a>
-                    </li>
-                {% endif %}
-            </ul>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </div>
+            {% else %}
+                <a class="nav-link text-light" href="{{ url_for('login') }}">Login</a>
+            {% endif %}
         </div>
     </div>
 </nav>
 
-<div class="container mt-4">
+
+<!-- 📋 Sidebar -->
+<div class="sidebar">
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+            <i class="bi bi-house-door"></i> Home
+        </a>
+
+        <a href="{{ url_for('products') }}" class="{% if request.endpoint == 'products' %}active{% endif %}">
+            <i class="bi bi-box-seam"></i> Products
+        </a>
+
+        <a href="{{ url_for('warehouses') }}" class="{% if request.endpoint == 'warehouses' %}active{% endif %}">
+            <i class="bi bi-building"></i> Warehouses
+        </a>
+
+        <a href="{{ url_for('transactions') }}" class="{% if request.endpoint == 'transactions' %}active{% endif %}">
+            <i class="bi bi-arrow-left-right"></i> Transactions
+        </a>
+
+        <a href="{{ url_for('partners') }}" class="{% if request.endpoint == 'partners' %}active{% endif %}">
+            <i class="bi bi-people"></i> Partners
+        </a>
+
+        {% if current_user.role == 'Admin / Owner' %}
+        <a href="{{ url_for('users') }}" class="{% if request.endpoint == 'users' %}active{% endif %}">
+            <i class="bi bi-person-gear"></i> Users
+        </a>
+        <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">
+            <i class="bi bi-gear"></i> Settings
+        </a>
+        {% endif %}
+    {% endif %}
+</div>
+
+<!-- 📄 Main Content -->
+<div class="main-content">
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
+        {% if messages %}
         <div class="alert alert-info">
             {% for message in messages %}
                 {{ message }}<br>
             {% endfor %}
         </div>
-      {% endif %}
+        {% endif %}
     {% endwith %}
-    
+
     {% block content %}{% endblock %}
 </div>
 

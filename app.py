@@ -11,6 +11,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+from flask import g
+
+
 
 # --- App Setup ---
 app = Flask(__name__)
@@ -100,6 +103,68 @@ class Transaction(db.Model):
     partner = db.relationship('Partner', back_populates='transactions')
 
 
+class AppConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company_name = db.Column(db.String(120), nullable=False, default="My Company")
+    logo_path = db.Column(db.String(200), nullable=True)
+    notifications_enabled = db.Column(db.Boolean, default=True)
+
+
+#COMPANY  LOGO BY ADMIN
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+@roles_required('Admin / Owner')
+def settings():
+    config = AppConfig.query.first()
+    if not config:
+        config = AppConfig(company_name="My Company")
+        db.session.add(config)
+        db.session.commit()
+
+    if request.method == 'POST':
+        config.company_name = request.form.get('company_name')
+        config.notifications_enabled = bool(request.form.get('notifications_enabled'))
+
+        logo = request.files.get('logo')
+        if logo and logo.filename:
+            filename = f"company_logo_{config.id}.png"
+            logo_path = f"static/uploads/{filename}"
+            os.makedirs(os.path.dirname(logo_path), exist_ok=True)
+            logo.save(logo_path)
+            config.logo_path = logo_path
+
+        db.session.commit()
+        flash("Settings updated successfully!", "success")
+        return redirect(url_for('settings'))
+
+    return render_template('settings.html', config=config)
+
+@app.before_request
+def load_company_settings():
+    config = AppConfig.query.first()  # use the class defined in app.py
+    if not config:
+        # create default config if not found
+        config = AppConfig(company_name="Inventory Manager", notifications_enabled=True)
+        db.session.add(config)
+        db.session.commit()
+    g.app_config = config
+
+# --- Products Page ---
+@app.route('/products')
+@login_required
+def products():
+    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
+
+    # Get products visible to this user
+    if current_user.role in ['Admin / Owner', 'Warehouse Manager']:
+        products = Product.query.filter_by(owner_id=owner_id).all()
+    else:
+        products = Product.query.filter_by(owner_id=owner_id).all()  # Sales: limited view
+
+    warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
+
+    return render_template('products.html', products=products, warehouses=warehouses)
+
 
 
 # --- User Loader ---
@@ -119,17 +184,14 @@ def index():
     warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
     return render_template('index.html', products=products, warehouses=warehouses, username=current_user.username)
 
-# @app.route('/products')
-# @login_required
-# def products():
-#     return render_template('products.html')
-
-
-# Add product (with SKU merge confirmation)
+# Add product
 @app.route('/add', methods=['POST'])
 @login_required
 def add_product():
+    redirect_page = request.form.get('redirect_page', 'index')  # default redirect to index
     name = request.form.get('name')
+    sku = request.form.get('sku')
+    category = request.form.get('category')
     try:
         quantity = int(request.form.get('quantity', 0))
     except ValueError:
@@ -138,32 +200,29 @@ def add_product():
         price = float(request.form.get('price', 0))
     except ValueError:
         price = 0.0
-    sku = request.form.get('sku')
-    category = request.form.get('category')
     warehouse_id = request.form.get('warehouse_id')
 
     if not warehouse_id:
         flash("Please select a warehouse.")
-        return redirect(url_for('index'))
+        return redirect(url_for(redirect_page))
 
     try:
         warehouse_id = int(warehouse_id)
     except ValueError:
         flash("Invalid warehouse selected.")
-        return redirect(url_for('index'))
+        return redirect(url_for(redirect_page))
 
     image_file = request.files.get('image')
     owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
 
-    # ensure sku provided
+    # SKU required
     if not sku:
         flash("Please provide SKU.")
-        return redirect(url_for('index'))
+        return redirect(url_for(redirect_page))
 
-    # Check existing product with same SKU for same owner+warehouse
+    # Check existing SKU
     existing = Product.query.filter_by(sku=sku, owner_id=owner_id, warehouse_id=warehouse_id).first()
     if existing:
-        # Return index but set flag to show merge modal
         warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
         products = Product.query.filter_by(owner_id=owner_id).all()
         new_product_data = {
@@ -176,7 +235,7 @@ def add_product():
             "image_file": image_file.filename if image_file else None
         }
         return render_template(
-            'index.html',
+            f'{redirect_page}.html',
             show_merge_modal=True,
             existing_product=existing,
             new_product_data=new_product_data,
@@ -205,7 +264,8 @@ def add_product():
     db.session.add(new_product)
     db.session.commit()
     flash(f"Product '{name}' added successfully!")
-    return redirect(url_for('index'))
+    return redirect(url_for(redirect_page))
+
 
 
 # Merge route (confirmed by user from modal) — increases existing quantity
@@ -557,6 +617,8 @@ def login():
         flash('Invalid credentials.')
         return redirect(url_for('login'))
     return render_template('login.html')
+
+
 
 @app.route('/logout')
 @login_required
