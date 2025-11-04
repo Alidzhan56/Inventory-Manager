@@ -1,7 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}Home - Inventory Manager{% endblock %}
+
+{% block title %}{{ _('Home') }} - {{ _('Inventory Manager') }}{% endblock %}
 
 {% block content %}
-<h3>Welcome, {{ current_user.username }}!</h3>
-<p>Dashboard overview coming soon...</p>
+<div class="container mt-4">
+    <!-- Main content starts here -->
+    <h3>{{ _('Welcome') }}, {{ current_user.username }}!</h3>
+    <p>{{ _('Dashboard overview coming soon...') }}</p>
+    <!-- End of main content -->
+</div>
 {% endblock %}

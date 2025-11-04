@@ -1,24 +1,23 @@
 {% extends 'base.html' %}
-
-{% block title %}Transactions{% endblock %}
+{% block title %}{{ _('Transactions') }}{% endblock %}
 
 {% block content %}
 <div class="card shadow-sm">
     <div class="card-header bg-primary text-white">
-        Record Transaction (Sale or Purchase)
+        {{ _('Record Transaction (Sale or Purchase)') }}
     </div>
     <div class="card-body">
         <form action="{{ url_for('add_transaction') }}" method="POST" class="row g-3">
             <div class="col-md-3">
                 <select name="type" class="form-select" required>
-                    <option value="">Select Type</option>
-                    <option value="Sale">Sale</option>
-                    <option value="Purchase">Purchase</option>
+                    <option value="">{{ _('Select Type') }}</option>
+                    <option value="Sale">{{ _('Sale') }}</option>
+                    <option value="Purchase">{{ _('Purchase') }}</option>
                 </select>
             </div>
             <div class="col-md-3">
                 <select name="product_id" class="form-select" required>
-                    <option value="">Select Product</option>
+                    <option value="">{{ _('Select Product') }}</option>
                     {% for p in products %}
                         <option value="{{ p.id }}">{{ p.name }} ({{ p.sku }})</option>
                     {% endfor %}
@@ -26,7 +25,7 @@
             </div>
             <div class="col-md-3">
                 <select name="partner_id" class="form-select" required>
-                    <option value="">Select Partner</option>
+                    <option value="">{{ _('Select Partner') }}</option>
                     {% for partner in partners %}
                         <option value="{{ partner.id }}">{{ partner.name }} - {{ partner.type }}</option>
                     {% endfor %}
@@ -34,36 +33,36 @@
             </div>
             <div class="col-md-3">
                 <select name="warehouse_id" class="form-select" required>
-                    <option value="">Select Warehouse</option>
+                    <option value="">{{ _('Select Warehouse') }}</option>
                     {% for w in warehouses %}
                         <option value="{{ w.id }}">{{ w.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
-                <input type="number" name="quantity" min="1" class="form-control" placeholder="Quantity" required>
+                <input type="number" name="quantity" min="1" class="form-control" placeholder="{{ _('Quantity') }}" required>
             </div>
             <div class="col-md-3">
-                <button type="submit" class="btn btn-success w-100">Record</button>
+                <button type="submit" class="btn btn-success w-100">{{ _('Record') }}</button>
             </div>
         </form>
     </div>
 </div>
 
 <div class="card shadow-sm mt-4">
-    <div class="card-header bg-secondary text-white">Transaction History</div>
+    <div class="card-header bg-secondary text-white">{{ _('Transaction History') }}</div>
     <div class="card-body table-responsive">
         <table class="table table-striped table-hover align-middle">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Type</th>
-                    <th>Product</th>
-                    <th>Partner</th>
-                    <th>Warehouse</th>
-                    <th>Quantity</th>
-                    <th>Total Price</th>
-                    <th>Date</th>
+                    <th>{{ _('#') }}</th>
+                    <th>{{ _('Type') }}</th>
+                    <th>{{ _('Product') }}</th>
+                    <th>{{ _('Partner') }}</th>
+                    <th>{{ _('Warehouse') }}</th>
+                    <th>{{ _('Quantity') }}</th>
+                    <th>{{ _('Total Price') }}</th>
+                    <th>{{ _('Date') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -72,9 +71,9 @@
                     <td>{{ loop.index }}</td>
                     <td>
                         {% if t.type == 'Sale' %}
-                            <span class="badge bg-danger">Sale</span>
+                            <span class="badge bg-danger">{{ _('Sale') }}</span>
                         {% else %}
-                            <span class="badge bg-success">Purchase</span>
+                            <span class="badge bg-success">{{ _('Purchase') }}</span>
                         {% endif %}
                     </td>
                     <td>{{ t.product.name }}</td>
@@ -86,7 +85,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted">No transactions recorded yet.</td>
+                    <td colspan="8" class="text-center text-muted">{{ _('No transactions recorded yet.') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -94,4 +93,3 @@
     </div>
 </div>
 {% endblock %}
-    

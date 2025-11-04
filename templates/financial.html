@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Financial Reports{% endblock %}
+{% block title %}{{ _('Financial Reports') }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Financial Reports (Admin Only)</h2>
+    <h2>{{ _('Financial Reports (Admin Only)') }}</h2>
 
-    <p>Here you can add Profit & Loss, Top Performers, and other financial analysis.</p>
+    <p>{{ _('Here you can add Profit & Loss, Top Performers, and other financial analysis.') }}</p>
 
     <!-- Example placeholder table -->
     <div class="card shadow-sm mt-3">
@@ -14,18 +14,18 @@
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
-                        <th>Report</th>
-                        <th>Details</th>
+                        <th>{{ _('Report') }}</th>
+                        <th>{{ _('Details') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>P&L</td>
-                        <td>Coming soon...</td>
+                        <td>{{ _('P&L') }}</td>
+                        <td>{{ _('Coming soon...') }}</td>
                     </tr>
                     <tr>
-                        <td>Top Performers</td>
-                        <td>Coming soon...</td>
+                        <td>{{ _('Top Performers') }}</td>
+                        <td>{{ _('Coming soon...') }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -33,7 +33,7 @@
     </div>
 
     <div class="mt-3">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Inventory</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">{{ _('Back to Inventory') }}</a>
     </div>
 </div>
 {% endblock %}

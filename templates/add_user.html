@@ -1,48 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}Add User{% endblock %}
+{% block title %}{{ _('Add User') }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h3>Add New User</h3>
+    <h3>{{ _('Add New User') }}</h3>
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="alert alert-danger mt-2">
-          {% for msg in messages %}
-            <div>{{ msg }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+        {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alert alert-danger mt-2">
+          {% for msg in messages %}
+            <div>{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
-    <!-- Add User Form Card -->
-    <div class="card shadow-sm mt-3 mb-4">
-        <div class="card-header bg-primary text-white">
-            User Details
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('add_user') }}" class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" class="form-control" name="username" placeholder="Username" required>
-                </div>
-                <div class="col-md-4">
-                    <input type="password" class="form-control" name="password" placeholder="Password" required>
-                </div>
-                <div class="col-md-4">
-                    <select class="form-select" name="role" required>
-                        <option value="Admin / Owner">Admin / Owner</option>
-                        <option value="Warehouse Manager">Warehouse Manager</option>
-                        <option value="Sales Agent">Sales Agent</option>
-                    </select>
-                </div>
-                <div class="col-12">
-                    <button type="submit" class="btn btn-success">Add User</button>
-                    <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">Back to Users</a>
-                </div>
-            </form>
-        </div>
-    </div>
+        <div class="card shadow-sm mt-3 mb-4">
+        <div class="card-header bg-primary text-white">
+            {{ _('User Details') }}
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_user') }}" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="username" placeholder="{{ _('Username') }}" required>
+                </div>
+                <div class="col-md-4">
+                    <input type="password" class="form-control" name="password" placeholder="{{ _('Password') }}" required>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select" name="role" required>
+                        <option value="Admin / Owner">{{ _('Admin / Owner') }}</option>
+                        <option value="Warehouse Manager">{{ _('Warehouse Manager') }}</option>
+                        <option value="Sales Agent">{{ _('Sales Agent') }}</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">{{ _('Add User') }}</button>
+                    <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">{{ _('Back to Users') }}</a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

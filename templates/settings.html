@@ -1,20 +1,22 @@
 {% extends 'base.html' %}
+{% block title %}{{ _('Settings') }}{% endblock %}
+
 {% block content %}
 <div class="container mt-5">
-    <h2>⚙️ Settings</h2>
+    <h2>{{ _('⚙️ Settings') }}</h2>
     <form method="POST" enctype="multipart/form-data">
         <div class="mb-3">
-            <label for="company_name" class="form-label">Company Name</label>
+            <label for="company_name" class="form-label">{{ _('Company Name') }}</label>
             <input type="text" name="company_name" id="company_name" class="form-control" 
                    value="{{ config.company_name }}">
         </div>
 
         <div class="mb-3">
-            <label for="logo" class="form-label">Company Logo</label>
+            <label for="logo" class="form-label">{{ _('Company Logo') }}</label>
             {% if config.logo_path %}
                 <div class="mb-2">
                     <img src="{{ url_for('static', filename=config.logo_path.split('static/')[-1]) }}" 
-                         alt="Company Logo" height="100">
+                         alt="{{ _('Company Logo') }}" height="100">
                 </div>
             {% endif %}
             <input type="file" name="logo" id="logo" class="form-control">
@@ -24,11 +26,11 @@
             <input class="form-check-input" type="checkbox" name="notifications_enabled" id="notifications_enabled"
                    {% if config.notifications_enabled %}checked{% endif %}>
             <label class="form-check-label" for="notifications_enabled">
-                Enable Notifications
+                {{ _('Enable Notifications') }}
             </label>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="submit" class="btn btn-primary">{{ _('Save Changes') }}</button>
     </form>
 </div>
 {% endblock %}

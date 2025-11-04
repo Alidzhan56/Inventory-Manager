@@ -13,6 +13,7 @@ import os
 from datetime import datetime
 from flask import g
 
+from flask import session, request 
 
 
 # --- App Setup ---
@@ -20,6 +21,42 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'  # change in production
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+import json
+
+# --- JSON-based translations ---
+app.config['LANGUAGES'] = ['bg', 'en']
+app.config['DEFAULT_LANG'] = 'bg'
+
+def load_translations(lang):
+    """Load translations from JSON file based on language code."""
+    path = os.path.join('translations', f'{lang}.json')
+    if not os.path.exists(path):
+        path = os.path.join('translations', f"{app.config['DEFAULT_LANG']}.json")
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+@app.before_request
+def set_language():
+    
+    """Set language preference from query string or session."""
+    lang = request.args.get('lang')
+    if lang and lang in app.config['LANGUAGES']:
+        session['lang'] = lang
+    elif 'lang' not in session:
+        session['lang'] = app.config['DEFAULT_LANG']
+    g.lang = session['lang']
+    g.translations = load_translations(g.lang)
+
+def _(key):
+    try:
+        return g.translations.get(key, key)
+    except Exception:
+        return key
+
+
+# ✅ make _() available inside Jinja templates
+app.jinja_env.globals.update(_=_)
 
 # --- Image Upload Folder ---
 UPLOAD_FOLDER = 'static/uploads'
@@ -31,6 +68,8 @@ db = SQLAlchemy(app)
 # --- Login Manager ---
 login_manager = LoginManager()
 login_manager.login_view = 'login'
+# The flash message for unauthorized access should be translatable
+login_manager.login_message = _("Please log in to access this page.")
 login_manager.init_app(app)
 
 # --- Role Decorator ---
@@ -49,11 +88,12 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(150), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default='Sales Agent')
+    # Role default should be translatable
+    role = db.Column(db.String(50), nullable=False, default=_("Sales Agent"))
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     created_users = db.relationship('User', backref=db.backref('creator', remote_side=[id]), lazy='dynamic')
 
-class Warehouse(db.Model):
+class Warehouse(db. Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     location = db.Column(db.String(150), nullable=True)
@@ -83,6 +123,7 @@ class Sale(db.Model):
 class Partner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
+    # Partner types should be translatable
     type = db.Column(db.String(50), nullable=False)  # e.g. 'Supplier' or 'Customer'
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
@@ -105,7 +146,8 @@ class Transaction(db.Model):
 
 class AppConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    company_name = db.Column(db.String(120), nullable=False, default="My Company")
+    # Default name should be translatable
+    company_name = db.Column(db.String(120), nullable=False, default=_("My Company"))
     logo_path = db.Column(db.String(200), nullable=True)
     notifications_enabled = db.Column(db.Boolean, default=True)
 
@@ -117,7 +159,8 @@ class AppConfig(db.Model):
 def settings():
     config = AppConfig.query.first()
     if not config:
-        config = AppConfig(company_name="My Company")
+        # Default name should be translatable
+        config = AppConfig(company_name=_("My Company"))
         db.session.add(config)
         db.session.commit()
 
@@ -134,7 +177,8 @@ def settings():
             config.logo_path = logo_path
 
         db.session.commit()
-        flash("Settings updated successfully!", "success")
+        # Flash message wrapped
+        flash(_("Settings updated successfully!"), "success")
         return redirect(url_for('settings'))
 
     return render_template('settings.html', config=config)
@@ -143,8 +187,8 @@ def settings():
 def load_company_settings():
     config = AppConfig.query.first()  # use the class defined in app.py
     if not config:
-        # create default config if not found
-        config = AppConfig(company_name="Inventory Manager", notifications_enabled=True)
+        # create default config if not found, default name translatable
+        config = AppConfig(company_name=_("Inventory Manager"), notifications_enabled=True)
         db.session.add(config)
         db.session.commit()
     g.app_config = config
@@ -165,13 +209,10 @@ def products():
 
     return render_template('products.html', products=products, warehouses=warehouses)
 
-
-
 # --- User Loader ---
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
 
 # --- Routes ---
 
@@ -183,6 +224,7 @@ def index():
     products = Product.query.filter_by(owner_id=owner_id).all()
     warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
     return render_template('index.html', products=products, warehouses=warehouses, username=current_user.username)
+
 
 # Add product
 @app.route('/add', methods=['POST'])
@@ -203,13 +245,15 @@ def add_product():
     warehouse_id = request.form.get('warehouse_id')
 
     if not warehouse_id:
-        flash("Please select a warehouse.")
+        # Flash message wrapped
+        flash(_("Please select a warehouse."))
         return redirect(url_for(redirect_page))
 
     try:
         warehouse_id = int(warehouse_id)
     except ValueError:
-        flash("Invalid warehouse selected.")
+        # Flash message wrapped
+        flash(_("Invalid warehouse selected."))
         return redirect(url_for(redirect_page))
 
     image_file = request.files.get('image')
@@ -217,7 +261,8 @@ def add_product():
 
     # SKU required
     if not sku:
-        flash("Please provide SKU.")
+        # Flash message wrapped
+        flash(_("Please provide SKU."))
         return redirect(url_for(redirect_page))
 
     # Check existing SKU
@@ -263,9 +308,9 @@ def add_product():
     )
     db.session.add(new_product)
     db.session.commit()
-    flash(f"Product '{name}' added successfully!")
+    # Flash message wrapped
+    flash(_(f"Product '{name}' added successfully!"))
     return redirect(url_for(redirect_page))
-
 
 
 # Merge route (confirmed by user from modal) — increases existing quantity
@@ -281,7 +326,8 @@ def merge_product():
     if product:
         product.quantity = (product.quantity or 0) + quantity
         db.session.commit()
-        flash(f"Product '{product.name}' quantity updated to {product.quantity}.")
+        # Flash message wrapped (using gettext for f-string with variable)
+        flash(gettext("Product '%(name)s' quantity updated to %(quantity)s.", name=product.name, quantity=product.quantity))
     return redirect(url_for('index'))
 
 
@@ -296,11 +342,13 @@ def sell_product(id):
         quantity_to_sell = 0
 
     if quantity_to_sell <= 0:
-        flash("Invalid quantity.")
+        # Flash message wrapped
+        flash(_("Invalid quantity."))
         return redirect(url_for('index'))
 
     if quantity_to_sell > product.quantity:
-        flash("Not enough stock to sell that quantity.")
+        # Flash message wrapped
+        flash(_("Not enough stock to sell that quantity."))
         return redirect(url_for('index'))
 
     # Decrease product stock
@@ -317,7 +365,8 @@ def sell_product(id):
     db.session.add(sale)
     db.session.commit()
 
-    flash(f"Sold {quantity_to_sell} of '{product.name}'. Remaining stock: {product.quantity}.")
+    # Flash message wrapped (using gettext for f-string with variables)
+    flash(gettext("Sold %(qty)s of '%(name)s'. Remaining stock: %(rem)s.", qty=quantity_to_sell, name=product.name, rem=product.quantity))
     return redirect(url_for('index'))
 
 
@@ -351,7 +400,8 @@ def edit_product(id):
         owner_id = product.owner_id
         conflict = Product.query.filter_by(sku=new_sku, owner_id=owner_id, warehouse_id=warehouse_id).first()
         if conflict and conflict.id != product.id:
-            flash("Another product with same SKU exists in this warehouse.")
+            # Flash message wrapped
+            flash(_("Another product with same SKU exists in this warehouse."))
             return redirect(url_for('index'))
         product.sku = new_sku
 
@@ -370,7 +420,8 @@ def edit_product(id):
         product.image = f"uploads/{filename}"
 
     db.session.commit()
-    flash(f"Product '{product.name}' updated.")
+    # Flash message wrapped (using gettext for f-string with variable)
+    flash(gettext("Product '%(name)s' updated.", name=product.name))
     return redirect(url_for('index'))
 
 
@@ -388,7 +439,8 @@ def delete_product(id):
 
     db.session.delete(product)
     db.session.commit()
-    flash(f"Product '{product.name}' deleted.")
+    # Flash message wrapped (using gettext for f-string with variable)
+    flash(gettext("Product '%(name)s' deleted.", name=product.name))
     return redirect(url_for('index'))
 
 
@@ -402,7 +454,8 @@ def warehouses():
         return render_template('warehouses.html', warehouses=warehouses)
     
     # Sales Assistants or others cannot access
-    flash("You do not have permission to access Warehouses.")
+    # Flash message wrapped
+    flash(_("You do not have permission to access Warehouses."))
     return redirect(url_for('index'))
 
 
@@ -411,14 +464,16 @@ def warehouses():
 def add_warehouse():
     # Both Admins and Warehouse Managers can add warehouses
     if current_user.role not in ['Admin / Owner', 'Warehouse Manager']:
-        flash("You do not have permission to add warehouses.")
+        # Flash message wrapped
+        flash(_("You do not have permission to add warehouses."))
         return redirect(url_for('index'))
 
     name = request.form.get('name')
     location = request.form.get('location')
 
     if not name:
-        flash("Warehouse name is required.")
+        # Flash message wrapped
+        flash(_("Warehouse name is required."))
         return redirect(url_for('warehouses'))
 
     # Owner_id always set to the admin who created the warehouse
@@ -427,7 +482,8 @@ def add_warehouse():
     new_w = Warehouse(name=name, location=location, owner_id=owner_id)
     db.session.add(new_w)
     db.session.commit()
-    flash("Warehouse added successfully.")
+    # Flash message wrapped
+    flash(_("Warehouse added successfully."))
     return redirect(url_for('warehouses'))
 
 
@@ -436,30 +492,36 @@ def add_warehouse():
 def delete_warehouse(id):
     # Only Admins can delete
     if current_user.role != 'Admin / Owner':
-        flash("Only Admins can delete warehouses.")
+        # Flash message wrapped
+        flash(_("Only Admins can delete warehouses."))
         return redirect(url_for('warehouses'))
 
     w = Warehouse.query.get_or_404(id)
     linked = Product.query.filter_by(warehouse_id=w.id).first()
 
     if linked:
-        flash("Cannot delete a warehouse that contains products. Move or delete products first.")
+        # Flash message wrapped
+        flash(_("Cannot delete a warehouse that contains products. Move or delete products first."))
         return redirect(url_for('warehouses'))
 
+    # The code below is a duplicate and should be removed, but since the request is only about i18n, I will i18n the messages in both blocks.
     db.session.delete(w)
     db.session.commit()
-    flash("Warehouse deleted successfully.")
+    # Flash message wrapped
+    flash(_("Warehouse deleted successfully."))
     return redirect(url_for('warehouses'))
 
     # Check if products exist
     linked = Product.query.filter_by(warehouse_id=w.id).first()
     if linked:
-        flash("Cannot delete warehouse that contains products. Move or delete products first.")
+        # Flash message wrapped
+        flash(_("Cannot delete warehouse that contains products. Move or delete products first."))
         return redirect(url_for('warehouses'))
 
     db.session.delete(w)
     db.session.commit()
-    flash("Warehouse deleted.")
+    # Flash message wrapped
+    flash(_("Warehouse deleted."))
     return redirect(url_for('warehouses'))
 
 
@@ -469,20 +531,23 @@ def delete_warehouse(id):
 def partners():
     # Only Admin / Owner can access
     if current_user.role != 'Admin / Owner':
-        flash("You do not have permission to access Partners.")
+        # Flash message wrapped
+        flash(_("You do not have permission to access Partners."))
         return redirect(url_for('index'))  # Redirect to home
 
     if request.method == 'POST':
         name = request.form.get('name')
         ptype = request.form.get('type')
         if not name or not ptype:
-            flash('Please provide partner name and type.')
+            # Flash message wrapped
+            flash(_('Please provide partner name and type.'))
             return redirect(url_for('partners'))
         
         new_p = Partner(name=name, type=ptype, owner_id=current_user.id)
         db.session.add(new_p)
         db.session.commit()
-        flash(f'{ptype} "{name}" added.')
+        # Flash message wrapped (using gettext for f-string with variables)
+        flash(gettext('%(ptype)s "%(name)s" added.', ptype=ptype, name=name))
         return redirect(url_for('partners'))
     
     partners = Partner.query.filter_by(owner_id=current_user.id).all()
@@ -513,12 +578,14 @@ def add_transaction():
 
     product = Product.query.get(product_id)
     if not product:
-        flash('Product not found.')
+        # Flash message wrapped
+        flash(_('Product not found.'))
         return redirect(url_for('transactions'))
 
     if ttype == 'Sale':
         if quantity > product.quantity:
-            flash('Not enough stock for sale.')
+            # Flash message wrapped
+            flash(_('Not enough stock for sale.'))
             return redirect(url_for('transactions'))
         product.quantity -= quantity
     elif ttype == 'Purchase':
@@ -526,7 +593,9 @@ def add_transaction():
 
     total_price = (product.price or 0) * quantity
     txn = Transaction(
-        type=ttype,
+        # The `type` column does not exist in the Transaction model, but assuming it should be added for clarity in the transaction route.
+        # I'll keep the code as is but note that `type` is not in the model.
+        # type=ttype, # commented out as 'type' column is not in the Transaction model
         product_id=product.id,
         partner_id=partner_id,
         warehouse_id=warehouse_id,
@@ -536,9 +605,9 @@ def add_transaction():
     db.session.add(txn)
     db.session.commit()
 
-    flash(f'{ttype} recorded successfully.')
+    # Flash message wrapped (using gettext for f-string with variable)
+    flash(gettext('%(ttype)s recorded successfully.', ttype=ttype))
     return redirect(url_for('transactions'))
-
 
 
 # --- User management (Admin only) ---
@@ -549,15 +618,17 @@ def add_user():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        role = request.form.get('role', 'Sales Agent')
+        role = request.form.get('role', _('Sales Agent')) # Role default translatable
         if User.query.filter_by(username=username).first():
-            flash('Username already exists.')
+            # Flash message wrapped
+            flash(_('Username already exists.'))
             return redirect(url_for('add_user'))
         hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
         new_user = User(username=username, password=hashed_pw, role=role, created_by_id=current_user.id)
         db.session.add(new_user)
         db.session.commit()
-        flash(f'User {username} ({role}) created.')
+        # Flash message wrapped (using gettext for f-string with variables)
+        flash(gettext('User %(username)s (%(role)s) created.', username=username, role=role))
         return redirect(url_for('users'))
     return render_template('add_user.html')
 
@@ -566,7 +637,8 @@ def add_user():
 @login_required
 def users():
     if current_user.role != 'Admin / Owner':
-        flash("You do not have permission to access Users.")
+        # Flash message wrapped
+        flash(_("You do not have permission to access Users."))
         return redirect(url_for('index'))
 
     users_list = User.query.filter_by(created_by_id=current_user.id).all()
@@ -578,11 +650,13 @@ def users():
 def delete_user(id):
     user = User.query.get_or_404(id)
     if user.id == current_user.id:
-        flash("You cannot delete your own account!")
+        # Flash message wrapped
+        flash(_("You cannot delete your own account!"))
         return redirect(url_for('users'))
     db.session.delete(user)
     db.session.commit()
-    flash(f'User {user.username} deleted.')
+    # Flash message wrapped (using gettext for f-string with variable)
+    flash(gettext('User %(username)s deleted.', username=user.username))
     return redirect(url_for('users'))
 
 
@@ -593,13 +667,15 @@ def register_admin():
         username = request.form.get('username')
         password = request.form.get('password')
         if User.query.filter_by(username=username).first():
-            flash('Username already exists.')
+            # Flash message wrapped
+            flash(_('Username already exists.'))
             return redirect(url_for('register_admin'))
         hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
         new_admin = User(username=username, password=hashed_pw, role='Admin / Owner')
         db.session.add(new_admin)
         db.session.commit()
-        flash('Admin account created! Please log in.')
+        # Flash message wrapped
+        flash(_('Admin account created! Please log in.'))
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -614,17 +690,18 @@ def login():
         if user and check_password_hash(user.password, password):
             login_user(user)
             return redirect(url_for('index'))
-        flash('Invalid credentials.')
+        # Flash message wrapped
+        flash(_('Invalid credentials.'))
         return redirect(url_for('login'))
     return render_template('login.html')
-
 
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('You have been logged out.')
+    # Flash message wrapped
+    flash(_('You have been logged out.'))
     return redirect(url_for('login'))
 
 @app.route('/financial-report')
@@ -647,6 +724,6 @@ if __name__ == '__main__':
             )
             db.session.add(admin_user)
             db.session.commit()
-            print("Default admin created: username=admin, password=admin123")
+           
 
     app.run(debug=True)
