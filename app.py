@@ -16,6 +16,7 @@ from flask import g
 from flask import session, request 
 
 
+
 # --- App Setup ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'  # change in production
@@ -84,14 +85,15 @@ def roles_required(*roles):
     return decorator
 
 # --- Models ---
-class User(UserMixin, db.Model):
+
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-    # Role default should be translatable
-    role = db.Column(db.String(50), nullable=False, default=_("Sales Agent"))
+    username = db.Column(db.String(150), nullable=False, unique=True)
+    email = db.Column(db.String(150), nullable=False, unique=True)
+    password = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(50), nullable=False, default="User")
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    created_users = db.relationship('User', backref=db.backref('creator', remote_side=[id]), lazy='dynamic')
+
 
 class Warehouse(db. Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -103,14 +105,16 @@ class Warehouse(db. Model):
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    sku = db.Column(db.String(50), nullable=False)
+    category = db.Column(db.String(100))
     quantity = db.Column(db.Integer, nullable=False, default=0)
     price = db.Column(db.Float, nullable=False, default=0.0)
-    sku = db.Column(db.String(50), nullable=False)   # not unique at DB level
-    category = db.Column(db.String(100), nullable=True)
-    # store only path relative to static: 'uploads/filename.jpg'
-    image = db.Column(db.String(200), nullable=True)
+    image = db.Column(db.String(200))  # stores relative path like 'uploads/file.jpg'
+    
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'), nullable=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
+
+    
 
 class Sale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -123,11 +127,9 @@ class Sale(db.Model):
 class Partner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
-    # Partner types should be translatable
-    type = db.Column(db.String(50), nullable=False)  # e.g. 'Supplier' or 'Customer'
+    type = db.Column(db.String(50), nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-    # use back_populates and choose a name that won't conflict
     transactions = db.relationship('Transaction', back_populates='partner', lazy='dynamic')
 
 
@@ -135,13 +137,17 @@ class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     partner_id = db.Column(db.Integer, db.ForeignKey('partner.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
     quantity = db.Column(db.Integer, nullable=False)
     total_price = db.Column(db.Float)
     date = db.Column(db.DateTime, default=datetime.utcnow)
-    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouse.id'))
+    type = db.Column(db.String(50))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
-    # partner relationship (the other side of Partner.transactions)
     partner = db.relationship('Partner', back_populates='transactions')
+    product = db.relationship('Product', backref='transactions')
+    warehouse = db.relationship('Warehouse', backref='transactions')
+    user = db.relationship('User', backref='transactions')
 
 
 class AppConfig(db.Model):
@@ -226,14 +232,19 @@ def index():
     return render_template('index.html', products=products, warehouses=warehouses, username=current_user.username)
 
 
-# Add product
 @app.route('/add', methods=['POST'])
 @login_required
 def add_product():
-    redirect_page = request.form.get('redirect_page', 'index')  # default redirect to index
+    # Force stay on the products page
+    redirect_page = 'products'
+
     name = request.form.get('name')
     sku = request.form.get('sku')
     category = request.form.get('category')
+    warehouse_id = request.form.get('warehouse_id')
+    image_file = request.files.get('image')
+
+    # safe conversions
     try:
         quantity = int(request.form.get('quantity', 0))
     except ValueError:
@@ -242,32 +253,29 @@ def add_product():
         price = float(request.form.get('price', 0))
     except ValueError:
         price = 0.0
-    warehouse_id = request.form.get('warehouse_id')
+
+    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
 
     if not warehouse_id:
-        # Flash message wrapped
         flash(_("Please select a warehouse."))
         return redirect(url_for(redirect_page))
 
+    # Ensure warehouse_id is int
     try:
         warehouse_id = int(warehouse_id)
     except ValueError:
-        # Flash message wrapped
         flash(_("Invalid warehouse selected."))
         return redirect(url_for(redirect_page))
 
-    image_file = request.files.get('image')
-    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
-
-    # SKU required
     if not sku:
-        # Flash message wrapped
         flash(_("Please provide SKU."))
         return redirect(url_for(redirect_page))
 
-    # Check existing SKU
+    # --- Check if SKU exists ---
     existing = Product.query.filter_by(sku=sku, owner_id=owner_id, warehouse_id=warehouse_id).first()
+
     if existing:
+        # stay on page, trigger modal
         warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
         products = Product.query.filter_by(owner_id=owner_id).all()
         new_product_data = {
@@ -280,7 +288,7 @@ def add_product():
             "image_file": image_file.filename if image_file else None
         }
         return render_template(
-            f'{redirect_page}.html',
+            'products.html',
             show_merge_modal=True,
             existing_product=existing,
             new_product_data=new_product_data,
@@ -288,14 +296,14 @@ def add_product():
             products=products
         )
 
-    # Save image if uploaded
+    # --- handle image ---
     image_relpath = None
     if image_file and image_file.filename != '':
         filename = secure_filename(image_file.filename)
         image_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         image_relpath = f"uploads/{filename}"
 
-    # Create product
+    # --- create new ---
     new_product = Product(
         name=name,
         quantity=quantity,
@@ -306,29 +314,34 @@ def add_product():
         owner_id=owner_id,
         warehouse_id=warehouse_id
     )
+
     db.session.add(new_product)
     db.session.commit()
-    # Flash message wrapped
-    flash(_(f"Product '{name}' added successfully!"))
+    flash(_("Product '%(name)s' added successfully!") % {'name': name})
     return redirect(url_for(redirect_page))
 
 
 # Merge route (confirmed by user from modal) — increases existing quantity
-@app.route('/merge', methods=['POST'])
+@app.route('/merge_product', methods=['POST'])
 @login_required
 def merge_product():
     existing_id = request.form.get('existing_id')
-    try:
-        quantity = int(request.form.get('quantity', 0))
-    except ValueError:
-        quantity = 0
-    product = Product.query.get(existing_id)
-    if product:
-        product.quantity = (product.quantity or 0) + quantity
-        db.session.commit()
-        # Flash message wrapped (using gettext for f-string with variable)
-        flash(gettext("Product '%(name)s' quantity updated to %(quantity)s.", name=product.name, quantity=product.quantity))
-    return redirect(url_for('index'))
+    add_qty = request.form.get('add_qty', type=int)
+
+    existing = Product.query.get(existing_id)
+    if not existing:
+        flash(_("Product not found."), "danger")
+        return redirect(url_for('products'))
+
+    # ✅ Only add quantity; do NOT change price, name, or category
+    existing.quantity += add_qty
+    db.session.commit()
+
+    flash(_("Quantity successfully merged for %(name)s (new total: %(qty)d).", 
+           name=existing.name, qty=existing.quantity), "success")
+
+    return redirect(url_for('products'))
+
 
 
 # Sell product (records sale and decreases stock immediately)
@@ -365,8 +378,8 @@ def sell_product(id):
     db.session.add(sale)
     db.session.commit()
 
-    # Flash message wrapped (using gettext for f-string with variables)
-    flash(gettext("Sold %(qty)s of '%(name)s'. Remaining stock: %(rem)s.", qty=quantity_to_sell, name=product.name, rem=product.quantity))
+    # Flash message wrapped (using % formatting)
+    flash(_("Sold %(qty)s of '%(name)s'. Remaining stock: %(rem)s.") % {'qty': quantity_to_sell, 'name': product.name, 'rem': product.quantity})
     return redirect(url_for('index'))
 
 
@@ -377,41 +390,47 @@ def edit_product(id):
     product = Product.query.get_or_404(id)
 
     # ensure current user can edit this product
-    owner_allowed = (current_user.role == 'Admin / Owner' and product.owner_id == current_user.id) or \
-                    (current_user.role != 'Admin / Owner' and product.owner_id == current_user.created_by_id)
+    owner_allowed = (
+        (current_user.role == 'Admin / Owner' and product.owner_id == current_user.id) or
+        (current_user.role != 'Admin / Owner' and product.owner_id == current_user.created_by_id)
+    )
     if not owner_allowed:
         abort(403)
 
-    product.name = request.form.get('name')
-    try:
-        product.quantity = int(request.form.get('quantity', product.quantity))
-    except ValueError:
-        pass
-    try:
-        product.price = float(request.form.get('price', product.price))
-    except ValueError:
-        pass
-    new_sku = request.form.get('sku')
-    category = request.form.get('category')
+    # Get form fields safely
+    product.name = request.form.get('name', product.name)
+    product.category = request.form.get('category', product.category)
     warehouse_id = request.form.get('warehouse_id')
 
-    # check sku conflict in same owner+warehouse
-    if new_sku and (new_sku != product.sku):
-        owner_id = product.owner_id
-        conflict = Product.query.filter_by(sku=new_sku, owner_id=owner_id, warehouse_id=warehouse_id).first()
+    try:
+        product.quantity = int(request.form.get('quantity', product.quantity))
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        product.price = float(request.form.get('price', product.price))
+    except (ValueError, TypeError):
+        pass
+
+    new_sku = request.form.get('sku', product.sku)
+    if new_sku != product.sku:
+        # Prevent duplicate SKU in same warehouse and owner
+        conflict = Product.query.filter_by(
+            sku=new_sku,
+            owner_id=product.owner_id,
+            warehouse_id=warehouse_id
+        ).first()
         if conflict and conflict.id != product.id:
-            # Flash message wrapped
-            flash(_("Another product with same SKU exists in this warehouse."))
-            return redirect(url_for('index'))
+            flash(_("Another product with the same SKU exists in this warehouse."), 'warning')
+            return redirect(url_for('products'))
         product.sku = new_sku
 
-    product.category = category
     try:
         product.warehouse_id = int(warehouse_id) if warehouse_id else None
     except (ValueError, TypeError):
         pass
 
-    # image
+    # Handle image upload
     image_file = request.files.get('image')
     if image_file and image_file.filename:
         filename = secure_filename(image_file.filename)
@@ -420,10 +439,9 @@ def edit_product(id):
         product.image = f"uploads/{filename}"
 
     db.session.commit()
-    # Flash message wrapped (using gettext for f-string with variable)
-    flash(gettext("Product '%(name)s' updated.", name=product.name))
-    return redirect(url_for('index'))
 
+    flash(_("Product '%(name)s' updated successfully!") % {'name': product.name}, 'success')
+    return redirect(url_for('products'))
 
 # Delete product
 @app.route('/delete/<int:id>')
@@ -439,8 +457,8 @@ def delete_product(id):
 
     db.session.delete(product)
     db.session.commit()
-    # Flash message wrapped (using gettext for f-string with variable)
-    flash(gettext("Product '%(name)s' deleted.", name=product.name))
+    # Flash message wrapped (using % formatting)
+    flash(_("Product '%(name)s' deleted.") % {'name': product.name})
     return redirect(url_for('index'))
 
 
@@ -546,8 +564,8 @@ def partners():
         new_p = Partner(name=name, type=ptype, owner_id=current_user.id)
         db.session.add(new_p)
         db.session.commit()
-        # Flash message wrapped (using gettext for f-string with variables)
-        flash(gettext('%(ptype)s "%(name)s" added.', ptype=ptype, name=name))
+        # Flash message wrapped (using % formatting)
+        flash(_('%(ptype)s "%(name)s" added.') % {'ptype': ptype, 'name': name})
         return redirect(url_for('partners'))
     
     partners = Partner.query.filter_by(owner_id=current_user.id).all()
@@ -555,145 +573,227 @@ def partners():
 
 
 
-# --- Transactions (Sales / Purchases) ---
-@app.route('/transactions', methods=['GET'])
+@app.route('/transactions', methods=['GET', 'POST'])
 @login_required
 def transactions():
     owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
-    txns = Transaction.query.join(Product).filter(Product.owner_id == owner_id).order_by(Transaction.date.desc()).all()
     products = Product.query.filter_by(owner_id=owner_id).all()
     partners = Partner.query.filter_by(owner_id=owner_id).all()
     warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
+
+    if request.method == 'POST':
+        ttype = request.form.get('type')
+        product_id = request.form.get('product_id')
+        partner_id = request.form.get('partner_id')
+        warehouse_id = request.form.get('warehouse_id')
+        quantity = int(request.form.get('quantity', 0))
+
+        product = Product.query.get(product_id)
+        if not product:
+            flash(_('Product not found.'), 'danger')
+            return redirect(url_for('transactions'))
+
+        if ttype == 'Sale':
+            if quantity > product.quantity:
+                flash(_('Not enough stock for sale.'), 'danger')
+                return redirect(url_for('transactions'))
+            product.quantity -= quantity
+        elif ttype == 'Purchase':
+            product.quantity += quantity
+
+        total_price = (product.price or 0) * quantity
+
+        txn = Transaction(
+            type=ttype,
+            product_id=product.id,
+            partner_id=partner_id,
+            warehouse_id=warehouse_id,
+            quantity=quantity,
+            total_price=total_price,
+            user_id=current_user.id
+        )
+        db.session.add(txn)
+        db.session.commit()
+        flash(_('%(ttype)s recorded successfully.') % {'ttype': ttype}, 'success')
+        return redirect(url_for('transactions'))
+
+    # For GET: show transactions
+    txns = (
+        Transaction.query
+        .join(Product)
+        .filter(Product.owner_id == owner_id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
     return render_template('transactions.html', txns=txns, products=products, partners=partners, warehouses=warehouses)
 
 
-@app.route('/transactions', methods=['POST'])
-@login_required
-def add_transaction():
-    ttype = request.form.get('type')
-    product_id = request.form.get('product_id')
-    partner_id = request.form.get('partner_id')
-    warehouse_id = request.form.get('warehouse_id')
-    quantity = int(request.form.get('quantity', 0))
-
-    product = Product.query.get(product_id)
-    if not product:
-        # Flash message wrapped
-        flash(_('Product not found.'))
-        return redirect(url_for('transactions'))
-
-    if ttype == 'Sale':
-        if quantity > product.quantity:
-            # Flash message wrapped
-            flash(_('Not enough stock for sale.'))
-            return redirect(url_for('transactions'))
-        product.quantity -= quantity
-    elif ttype == 'Purchase':
-        product.quantity += quantity
-
-    total_price = (product.price or 0) * quantity
-    txn = Transaction(
-        # The `type` column does not exist in the Transaction model, but assuming it should be added for clarity in the transaction route.
-        # I'll keep the code as is but note that `type` is not in the model.
-        # type=ttype, # commented out as 'type' column is not in the Transaction model
-        product_id=product.id,
-        partner_id=partner_id,
-        warehouse_id=warehouse_id,
-        quantity=quantity,
-        total_price=total_price
-    )
-    db.session.add(txn)
-    db.session.commit()
-
-    # Flash message wrapped (using gettext for f-string with variable)
-    flash(gettext('%(ttype)s recorded successfully.', ttype=ttype))
-    return redirect(url_for('transactions'))
-
-
 # --- User management (Admin only) ---
-@app.route('/add_user', methods=['GET', 'POST'])
+@app.route('/add_user', methods=['POST'])
 @login_required
-@roles_required('Admin / Owner')
 def add_user():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        role = request.form.get('role', _('Sales Agent')) # Role default translatable
-        if User.query.filter_by(username=username).first():
-            # Flash message wrapped
-            flash(_('Username already exists.'))
-            return redirect(url_for('add_user'))
-        hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
-        new_user = User(username=username, password=hashed_pw, role=role, created_by_id=current_user.id)
-        db.session.add(new_user)
-        db.session.commit()
-        # Flash message wrapped (using gettext for f-string with variables)
-        flash(gettext('User %(username)s (%(role)s) created.', username=username, role=role))
+    username = request.form.get('username')
+    email = request.form.get('email')  # <--- Must get email!
+    password = request.form.get('password')
+    role = request.form.get('role')
+    
+    # Optional: check if username or email exists
+    if User.query.filter((User.username == username) | (User.email == email)).first():
+        flash('Username or Email already exists.', 'danger')
         return redirect(url_for('users'))
-    return render_template('add_user.html')
+
+    hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
+    new_user = User(
+        username=username,
+        email=email,
+        password=hashed_pw,
+        role=role,
+        created_by_id=current_user.id
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    flash('User created successfully!', 'success')
+    return redirect(url_for('users'))
+
+
+@app.route('/developer')
+@login_required
+def developer_dashboard():
+    if current_user.role != "Developer":
+        abort(403)
+
+    return render_template('developer_dashboard.html')
+
+@app.route('/developer/users')
+@login_required
+def developer_users():
+    if current_user.role != "Developer":
+        abort(403)
+
+    users = User.query.all()
+    return render_template('developer_users.html', users=users)
 
 # --- User management (Admin only) ---
 @app.route('/users')
 @login_required
 def users():
-    if current_user.role != 'Admin / Owner':
-        # Flash message wrapped
-        flash(_("You do not have permission to access Users."))
-        return redirect(url_for('index'))
+    # Developer: can see all users
+    if current_user.role == "Developer":
+        users_list = User.query.all()
+        return render_template('users.html', users=users_list)
 
-    users_list = User.query.filter_by(created_by_id=current_user.id).all()
-    return render_template('users.html', users=users_list)
+    # Admin/Owner: can see only users they created
+    if current_user.role == "Admin / Owner":
+        users_list = User.query.filter_by(created_by_id=current_user.id).all()
+        return render_template('users.html', users=users_list)
 
-@app.route('/delete_user/<int:id>')
+    # # Everyone else: no access
+    # flash(_("You do not have permission to access Users."))
+    # return redirect(url_for('index'))
+
+@app.route('/delete_user/<int:id>', methods=['POST'])
 @login_required
-@roles_required('Admin / Owner')
 def delete_user(id):
     user = User.query.get_or_404(id)
+
+    # Prevent deleting yourself
     if user.id == current_user.id:
-        # Flash message wrapped
         flash(_("You cannot delete your own account!"))
         return redirect(url_for('users'))
-    db.session.delete(user)
-    db.session.commit()
-    # Flash message wrapped (using gettext for f-string with variable)
-    flash(gettext('User %(username)s deleted.', username=user.username))
-    return redirect(url_for('users'))
+
+    # Developer: can delete anyone
+    if current_user.role == "Developer":
+        db.session.delete(user)
+        db.session.commit()
+        flash(_("User %(username)s deleted.") % {'username': user.username})
+        return redirect(url_for('users'))
+
+    # Admin/Owner: can only delete users they created
+    if current_user.role == "Admin / Owner":
+        if user.created_by_id != current_user.id:
+            flash(_("You do not have permission to delete this user."))
+            return redirect(url_for('users'))
+        
+        db.session.delete(user)
+        db.session.commit()
+        flash(_("User %(username)s deleted.") % {'username': user.username})
+        return redirect(url_for('users'))
+
+    # All other roles: blocked
+    flash(_("Unauthorized action."))
+    return redirect(url_for('index'))
 
 
-# --- Registration (optional) ---
+
+# --- Admin / Owner Registration ---
 @app.route('/register_admin', methods=['GET', 'POST'])
 def register_admin():
     if request.method == 'POST':
+        email = request.form.get('email')
         username = request.form.get('username')
         password = request.form.get('password')
-        if User.query.filter_by(username=username).first():
-            # Flash message wrapped
-            flash(_('Username already exists.'))
-            return redirect(url_for('register_admin'))
+        confirm_password = request.form.get('confirm_password')
+
+        # Check required fields
+        if not email or not username or not password or not confirm_password:
+            flash(_('Please fill in all required fields.'), 'danger')
+            return render_template('register.html')
+
+        # Check password match
+        if password != confirm_password:
+            flash(_('Passwords do not match.'), 'danger')
+            return render_template('register.html')
+
+        # Check if email or username exists
+        if User.query.filter((User.username == username) | (User.email == email)).first():
+            flash(_('An account with this email or username already exists.'), 'danger')
+            return render_template('register.html')
+
+        # Create user
         hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
-        new_admin = User(username=username, password=hashed_pw, role='Admin / Owner')
+        new_admin = User(
+            username=username,
+            email=email,
+            password=hashed_pw,
+            role='Admin / Owner'
+        )
         db.session.add(new_admin)
         db.session.commit()
-        # Flash message wrapped
-        flash(_('Admin account created! Please log in.'))
+        flash(_('Admin account created! Please log in.'), 'success')
         return redirect(url_for('login'))
-    return render_template('register.html')
 
+    return render_template('register.html')
 
 # --- Login/logout ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
+        identifier = request.form.get('identifier')   # email OR username
         password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            return redirect(url_for('index'))
-        # Flash message wrapped
-        flash(_('Invalid credentials.'))
-        return redirect(url_for('login'))
+
+        if not identifier or not password:
+            flash(_('Please fill in all fields.'), 'danger')
+            return redirect(url_for('login'))
+
+        # Search by email OR username
+        user = User.query.filter(
+            (User.username == identifier) | (User.email == identifier)
+        ).first()
+
+        if not user:
+            flash(_('No account found with that email or username.'), 'danger')
+            return redirect(url_for('login'))
+
+        if not check_password_hash(user.password, password):
+            flash(_('Incorrect password.'), 'danger')
+            return redirect(url_for('login'))
+
+        login_user(user)
+        return redirect(url_for('index'))
+
     return render_template('login.html')
+
 
 
 @app.route('/logout')
@@ -716,14 +816,26 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         # create default admin (only once)
-        if not User.query.filter_by(username='admin').first():
-            admin_user = User(
-                username='admin',
-                password=generate_password_hash('admin123', method='pbkdf2:sha256'),
-                role='Admin / Owner'
+        # if not User.query.filter_by(username='admin').first():
+        #     admin_user = User(
+        #         username='admin',
+        #         email='admin@example.com',  # ✅ Add this line
+        #         password=generate_password_hash('admin123', method='pbkdf2:sha256'),
+        #         role='Admin / Owner'
+        #     )
+        #     db.session.add(admin_user)
+        #     db.session.commit()
+
+        # Create developer account once
+        dev = User.query.filter_by(role="Developer").first()
+        if not dev:
+            developer = User(
+                username="developer",
+                email="developer@app.com",
+                password=generate_password_hash("dev12345", method="pbkdf2:sha256"),
+                role="Developer"
             )
-            db.session.add(admin_user)
+            db.session.add(developer)
             db.session.commit()
-           
 
     app.run(debug=True)

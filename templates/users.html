@@ -66,7 +66,12 @@
                         <td>{{ user.username }}</td>
                         <td>{{ _(user.role) }}</td>
                         <td>
-                            <a href="{{ url_for('delete_user', id=user.id) }}" class="btn btn-sm btn-danger">{{ _('Delete') }}</a>
+                           <form action="{{ url_for('delete_user', id=user.id) }}" method="POST" style="display:inline;">
+    <button class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">
+        {{ _('Delete') }}
+    </button>
+</form>
+
                         </td>
                     </tr>
                     {% else %}

@@ -1,107 +1,220 @@
 {% extends 'base.html' %}
-{% block title %}{{ _('Products') }}{% endblock %}
-
 {% block content %}
-<div class="container mt-4">
-    <h2>{{ _('Products') }}</h2>
+<div class="container py-4">
+  <h2 class="mb-4 text-center">{{ _('Products Management') }}</h2>
 
-    <!-- Add Product Button -->
-    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addProductModal">
-        {{ _('Add Product') }}
-    </button>
+  <!-- ✅ Add Product Form -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">{{ _('Add New Product') }}</h5>
+    </div>
+    <div class="card-body">
+      <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="redirect_page" value="products">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">{{ _('Product Name') }}</label>
+            <input type="text" class="form-control" name="name" required>
+          </div>
 
-    <!-- Products Table -->
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>{{ _('Name') }}</th>
-                <th>{{ _('SKU') }}</th>
-                <th>{{ _('Warehouse') }}</th>
-                <th>{{ _('Quantity') }}</th>
-                <th>{{ _('Actions') }}</th>
-            </tr>
+          <div class="col-md-4">
+            <label class="form-label">{{ _('SKU') }}</label>
+            <input type="text" class="form-control" name="sku" required>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">{{ _('Category') }}</label>
+            <input type="text" class="form-control" name="category" placeholder="{{ _('e.g. Electronics, Food') }}">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ _('Price') }}</label>
+            <input type="number" step="0.01" class="form-control" name="price" required>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ _('Quantity') }}</label>
+            <input type="number" class="form-control" name="quantity" required>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ _('Warehouse') }}</label>
+            <select name="warehouse_id" class="form-select" required>
+              {% for warehouse in warehouses %}
+              <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">{{ _('Product Picture') }}</label>
+            <input type="file" class="form-control" name="image" accept="image/*">
+          </div>
+        </div>
+
+        <div class="text-end mt-4">
+          <button type="submit" class="btn btn-success px-4">
+            <i class="bi bi-plus-circle me-1"></i> {{ _('Add Product') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ✅ Product List Table -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-secondary text-white">
+      <h5 class="mb-0">{{ _('Product List') }}</h5>
+    </div>
+    <div class="card-body table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>{{ _('Picture') }}</th>
+            <th>{{ _('Name') }}</th>
+            <th>{{ _('SKU') }}</th>
+            <th>{{ _('Category') }}</th>
+            <th>{{ _('Warehouse') }}</th>
+            <th>{{ _('Price') }}</th>
+            <th>{{ _('Quantity') }}</th>
+            <th class="text-center">{{ _('Actions') }}</th>
+          </tr>
         </thead>
         <tbody>
-            {% for p in products %}
-            <tr>
-                <td>{{ p.name }}</td>
-                <td>{{ p.sku }}</td>
-                <td>{{ p.warehouse.name if p.warehouse else '—' }}</td>
-                <td>{{ p.quantity }}</td>
-                <td>
-                    <!-- Edit/Delete buttons -->
-                    <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editProductModal{{ p.id }}">{{ _('Edit') }}</button>
-                    <!-- IMPORTANT: Removed the unsupportable confirm() function -->
-                    <a href="{{ url_for('delete_product', id=p.id) }}" class="btn btn-sm btn-danger">{{ _('Delete') }}</a>
-                </td>
-            </tr>
+          {% for product in products %}
+          <tr>
+            <td>
+              {% if product.image %}
+              <img src="{{ url_for('static', filename=product.image) }}"
+                   alt="{{ product.name }}" class="rounded border"
+                   style="width: 50px; height: 50px; object-fit: cover;">
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{{ product.name }}</td>
+            <td>{{ product.sku }}</td>
+            <td>{{ product.category or _('N/A') }}</td>
+            <td>{{ product.warehouse.name if product.warehouse else _('N/A') }}</td>
+            <td>{{ "%.2f"|format(product.price or 0) }}</td>
+            <td>{{ product.quantity }}</td>
+            <td class="text-center">
+              <!-- ✅ Edit -->
+              <button 
+                class="btn btn-sm btn-warning me-1 edit-btn"
+                data-id="{{ product.id }}"
+                data-name="{{ product.name }}"
+                data-sku="{{ product.sku }}"
+                data-category="{{ product.category }}"
+                data-price="{{ product.price }}"
+                data-quantity="{{ product.quantity }}"
+                data-warehouse="{{ product.warehouse_id }}">
+                <i class="bi bi-pencil"></i> {{ _('Edit') }}
+              </button>
 
-            <!-- Edit Product Modal -->
-            <div class="modal fade" id="editProductModal{{ p.id }}" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <form action="{{ url_for('edit_product', id=p.id) }}" method="POST" enctype="multipart/form-data">
-                            <div class="modal-header">
-                                <h5 class="modal-title">{{ _('Edit Product') }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <input type="text" name="name" class="form-control mb-2" value="{{ p.name }}" placeholder="{{ _('Name') }}" required>
-                                <input type="text" name="sku" class="form-control mb-2" value="{{ p.sku }}" placeholder="{{ _('SKU') }}" required>
-                                <input type="number" name="quantity" class="form-control mb-2" value="{{ p.quantity }}" placeholder="{{ _('Quantity') }}" required>
-                                <input type="number" step="0.01" name="price" class="form-control mb-2" value="{{ p.price }}" placeholder="{{ _('Price') }}" required>
-                                <input type="text" name="category" class="form-control mb-2" value="{{ p.category }}" placeholder="{{ _('Category') }}">
-                                <select name="warehouse_id" class="form-select mb-2" required>
-                                    <option value="">{{ _('Select Warehouse') }}</option>
-                                    {% for w in warehouses %}
-                                        <option value="{{ w.id }}" {% if p.warehouse_id == w.id %}selected{% endif %}>{{ w.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <input type="file" name="image" class="form-control mb-2">
-                            </div>
-                            <div class="modal-footer">
-                                <button type="submit" class="btn btn-primary">{{ _('Save Changes') }}</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+              <!-- ✅ Delete -->
+              <a href="{{ url_for('delete_product', id=product.id) }}"
+                 class="btn btn-sm btn-danger delete-product"
+                 data-confirm="{{ _('Are you sure you want to delete this product?') }}">
+                 <i class="bi bi-trash"></i> {{ _('Delete') }}
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
         </tbody>
-    </table>
-
-    <!-- Add Product Modal -->
-    <div class="modal fade" id="addProductModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{{ _('Add Product') }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="text" name="name" class="form-control mb-2" placeholder="{{ _('Name') }}" required>
-                        <input type="text" name="sku" class="form-control mb-2" placeholder="{{ _('SKU') }}" required>
-                        <input type="number" name="quantity" class="form-control mb-2" placeholder="{{ _('Quantity') }}" required>
-                        <input type="number" step="0.01" name="price" class="form-control mb-2" placeholder="{{ _('Price') }}" required>
-                        <input type="text" name="category" class="form-control mb-2" placeholder="{{ _('Category') }}">
-                        <select name="warehouse_id" class="form-select mb-2" required>
-                            <option value="">{{ _('Select Warehouse') }}</option>
-                            {% for w in warehouses %}
-                                <option value="{{ w.id }}">{{ w.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input type="file" name="image" class="form-control mb-2">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="submit" class="btn btn-success">{{ _('Add Product') }}</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+      </table>
     </div>
-
+  </div>
 </div>
+
+<!-- ✅ Delete Confirmation Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.delete-product').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const msg = this.getAttribute('data-confirm');
+      if (!confirm(msg)) e.preventDefault();
+    });
+  });
+
+  // Handle Edit button click → fill modal
+  const editButtons = document.querySelectorAll('.edit-btn');
+  editButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      document.getElementById('edit-id').value = this.dataset.id;
+      document.getElementById('edit-name').value = this.dataset.name;
+      document.getElementById('edit-sku').value = this.dataset.sku;
+      document.getElementById('edit-category').value = this.dataset.category;
+      document.getElementById('edit-price').value = this.dataset.price;
+      document.getElementById('edit-quantity').value = this.dataset.quantity;
+      document.getElementById('edit-warehouse').value = this.dataset.warehouse;
+      new bootstrap.Modal(document.getElementById('editModal')).show();
+    });
+  });
+});
+</script>
+
+<!-- ✅ Edit Product Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title" id="editModalLabel">{{ _('Edit Product') }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Close') }}"></button>
+      </div>
+      <form id="editForm" method="POST" enctype="multipart/form-data">
+        <div class="modal-body">
+          <input type="hidden" id="edit-id" name="id">
+          <div class="mb-3">
+            <label class="form-label">{{ _('Name') }}</label>
+            <input type="text" id="edit-name" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('SKU') }}</label>
+            <input type="text" id="edit-sku" name="sku" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Category') }}</label>
+            <input type="text" id="edit-category" name="category" class="form-control">
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ _('Price') }}</label>
+              <input type="number" id="edit-price" step="0.01" name="price" class="form-control" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ _('Quantity') }}</label>
+              <input type="number" id="edit-quantity" name="quantity" class="form-control" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Warehouse') }}</label>
+            <select id="edit-warehouse" name="warehouse_id" class="form-select" required>
+              {% for warehouse in warehouses %}
+              <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('New Image (optional)') }}</label>
+            <input type="file" name="image" class="form-control" accept="image/*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+          <button type="submit" class="btn btn-primary">{{ _('Save Changes') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Auto set form action dynamically -->
+<script>
+document.getElementById('editForm').addEventListener('submit', function(e) {
+  const id = document.getElementById('edit-id').value;
+  this.action = `/edit/${id}`;
+});
+</script>
+
 {% endblock %}

@@ -17,41 +17,54 @@
             border-radius: 0.5rem;
             background-color: white;
         }
-        /* Style for flashed messages */
-        .alert-info {
-            border-radius: 0.25rem;
-        }
     </style>
 </head>
+
 <body>
     <div class="container d-flex justify-content-center">
         <div class="login-container">
+
             <h1 class="text-center mb-4">{{ _('Login') }}</h1>
 
-            {% with messages = get_flashed_messages() %}
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <!-- Display flashed messages using Bootstrap alerts -->
-                    <div class="alert alert-info" role="alert">
-                        {% for msg in messages %}
-                            <p class="mb-0">{{ msg }}</p>
-                        {% endfor %}
-                    </div>
+                    {% for category, msg in messages %}
+                        <div class="alert alert-{{ category }} mb-2">{{ msg }}</div>
+                    {% endfor %}
                 {% endif %}
             {% endwith %}
 
             <form action="{{ url_for('login') }}" method="POST">
+
+                <!-- Email or username -->
                 <div class="mb-3">
-                    <input type="text" name="username" placeholder="{{ _('Username') }}" class="form-control rounded-lg" required>
+                    <input type="text" 
+                           name="identifier" 
+                           placeholder="{{ _('Email or Username') }}" 
+                           class="form-control rounded-lg" 
+                           required>
                 </div>
+
                 <div class="mb-3">
-                    <input type="password" name="password" placeholder="{{ _('Password') }}" class="form-control rounded-lg" required>
+                    <input type="password" 
+                           name="password" 
+                           placeholder="{{ _('Password') }}" 
+                           class="form-control rounded-lg" 
+                           required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100 mb-3 rounded-lg">{{ _('Login') }}</button>
+
+                <button type="submit" class="btn btn-primary w-100 mb-3 rounded-lg">
+                    {{ _('Login') }}
+                </button>
             </form>
 
             <p class="text-center mt-3">
-                <a href="{{ url_for('register_admin') }}" class="text-decoration-none">{{ _('Register as Admin') }}</a>
+                <a href="{{ url_for('register_admin') }}" class="text-decoration-none">
+                    {{ _('Register as Admin') }}
+                </a>
             </p>
+
         </div>
     </div>
 

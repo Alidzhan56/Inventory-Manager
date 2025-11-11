@@ -4,43 +4,56 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h3>{{ _('Add New User') }}</h3>
+    <h3>{{ _('Add New User') }}</h3>
 
-        {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="alert alert-danger mt-2">
-          {% for msg in messages %}
-            <div>{{ msg }}</div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, msg in messages %}
+                <div class="alert alert-{{ category }} mt-2">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-        <div class="card shadow-sm mt-3 mb-4">
-        <div class="card-header bg-primary text-white">
-            {{ _('User Details') }}
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('add_user') }}" class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" class="form-control" name="username" placeholder="{{ _('Username') }}" required>
-                </div>
-                <div class="col-md-4">
-                    <input type="password" class="form-control" name="password" placeholder="{{ _('Password') }}" required>
-                </div>
-                <div class="col-md-4">
-                    <select class="form-select" name="role" required>
-                        <option value="Admin / Owner">{{ _('Admin / Owner') }}</option>
-                        <option value="Warehouse Manager">{{ _('Warehouse Manager') }}</option>
-                        <option value="Sales Agent">{{ _('Sales Agent') }}</option>
-                    </select>
-                </div>
-                <div class="col-12">
-                    <button type="submit" class="btn btn-success">{{ _('Add User') }}</button>
-                    <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">{{ _('Back to Users') }}</a>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="card shadow-sm mt-3 mb-4">
+        <div class="card-header bg-primary text-white">
+            {{ _('User Details') }}
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('add_user') }}" class="row g-3" novalidate>
+                <!-- Email -->
+                <div class="col-md-4">
+                    <input type="email" class="form-control" name="email" placeholder="{{ _('Email') }}" required>
+                </div>
+
+                <!-- Username -->
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="username" placeholder="{{ _('Username') }}" required minlength="3">
+                </div>
+
+                <!-- Password -->
+                <div class="col-md-4">
+                    <input type="password" class="form-control" name="password" placeholder="{{ _('Password') }}" required minlength="8">
+                    <div class="form-text">
+                        {{ _('Use at least 8 characters, including uppercase, lowercase, numbers, and symbols.') }}
+                    </div>
+                </div>
+
+                <!-- Role -->
+                <div class="col-md-4">
+                    <select class="form-select" name="role" required>
+                        <option value="Admin / Owner">{{ _('Admin / Owner') }}</option>
+                        <option value="Warehouse Manager">{{ _('Warehouse Manager') }}</option>
+                        <option value="Sales Agent">{{ _('Sales Agent') }}</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success">{{ _('Add User') }}</button>
+                    <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">{{ _('Back to Users') }}</a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

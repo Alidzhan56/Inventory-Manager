@@ -43,6 +43,18 @@
             height: 32px;
             margin-right: 10px;
         }
+        /* New Text Switcher Styles */
+        .lang-switch a {
+            font-size: 1.1rem; /* Adjust size for text links */
+            text-decoration: none;
+            opacity: 0.6; /* Default opacity for inactive link */
+            transition: opacity 0.2s ease-in-out;
+            margin: 0 5px; /* Spacing between links */
+            font-weight: bold; /* Make the text stand out */
+        }
+        .lang-switch a.active {
+            opacity: 1; /* Full opacity for active link */
+        }
         .dropdown-menu-end {
             right: 0;
             left: auto;
@@ -51,11 +63,9 @@
 </head>
 <body>
 
-<!-- 🧭 Top Navbar -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
     <div class="container-fluid">
 
-        <!-- 🏢 Company Logo and Name -->
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
             {% if g.app_config.logo_path %}
                 <img src="{{ url_for('static', filename=g.app_config.logo_path.split('static/')[-1]) }}" 
@@ -67,39 +77,21 @@
             <span class="fw-bold">{{ g.app_config.company_name or _("Inventory Manager") }}</span>
         </a>
 
-<!-- 🌍 Language Switcher + Notifications + User Menu -->
-<div class="d-flex align-items-center ms-auto">
-
-    <!-- 🌍 Language Switcher -->
-    <div class="me-3">
-        <a href="?lang=bg" class="text-light {% if g.lang == 'bg' %}fw-bold{% endif %}">🇧🇬 BG</a> |
-        <a href="?lang=en" class="text-light {% if g.lang == 'en' %}fw-bold{% endif %}">🇬🇧 EN</a>
-    </div>
-
-    <!-- 🔔 Notifications Icon -->
-    {% if g.app_config.notifications_enabled %}
-    <a href="#" class="nav-link text-light me-3">
-        <i class="bi bi-bell-fill fs-5"></i>
-    </a>
-    {% endif %}
-
-
-
-        <!-- 🔔 Notifications + User Menu -->
         <div class="d-flex align-items-center ms-auto">
-            
-            <!-- Notifications Icon -->
-            {% if g.app_config.notifications_enabled %}
-            <a href="#" class="nav-link text-light me-3">
+
+            <div class="lang-switch me-3">
+                <a href="?lang=bg" class="text-light {% if g.lang == 'bg' %}active{% endif %}" title="Bulgarian">BG</a>
+                <a href="?lang=en" class="text-light {% if g.lang == 'en' %}active{% endif %}" title="English">EN</a>
+            </div>
+
+            <a href="#" class="nav-link text-light me-3" title="{{ _('Notifications') }}">
                 <i class="bi bi-bell-fill fs-5"></i>
             </a>
-            {% endif %}
 
-            <!-- 👤 User Dropdown -->
             {% if current_user.is_authenticated %}
             <div class="dropdown">
                 <a class="nav-link dropdown-toggle text-light d-flex align-items-center" href="#" 
-                    id="userDropdown" role="button" data-bs-toggle="dropdown">
+                   id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-person-circle fs-5 me-1"></i> 
                     <span>{{ current_user.username }}</span>
                 </a>
@@ -119,8 +111,8 @@
     </div>
 </nav>
 
+---
 
-<!-- 📋 Sidebar -->
 <div class="sidebar">
     {% if current_user.is_authenticated %}
         <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
@@ -154,7 +146,8 @@
     {% endif %}
 </div>
 
-<!-- 📄 Main Content -->
+---
+
 <div class="main-content">
     {% with messages = get_flashed_messages() %}
         {% if messages %}
