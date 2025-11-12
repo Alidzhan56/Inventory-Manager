@@ -4,19 +4,59 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ _('Register Company Owner') }}</title>
+
+  <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #1a73e8, #004e92);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      border: none;
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    .card-header {
+      background: #1a73e8;
+      font-weight: 600;
+    }
+    .form-control {
+      border-radius: 0.5rem;
+    }
+    .input-group-text {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+    }
+    .progress {
+      height: 6px;
+      border-radius: 3px;
+      background-color: #e9ecef;
+    }
+    ul#passwordRules {
+      margin-top: 0.5rem;
+      padding-left: 1rem;
+    }
+  </style>
 </head>
-<body class="bg-light d-flex align-items-center" style="min-height: 100vh;">
+
+<body>
 
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-md-6 col-lg-5">
-        <div class="card shadow-lg border-0">
-          <div class="card-header bg-primary text-white text-center py-3">
+        <div class="card shadow-lg">
+          <div class="card-header text-white text-center py-3">
             <h4 class="mb-0">{{ _('Register Company Owner') }}</h4>
           </div>
-          <div class="card-body">
+
+          <div class="card-body p-4">
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -24,14 +64,14 @@
                 {% for category, message in messages %}
                   <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
                     {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                   </div>
                 {% endfor %}
               {% endif %}
             {% endwith %}
 
             <form action="{{ url_for('register_admin') }}" method="POST" novalidate>
-              
+
               <!-- Email -->
               <div class="mb-3">
                 <label class="form-label">{{ _('Email Address') }}</label>
@@ -47,11 +87,23 @@
               <!-- Password -->
               <div class="mb-3">
                 <label class="form-label">{{ _('Password') }}</label>
-                <input type="password" id="password" name="password" class="form-control" required minlength="8">
-                <div id="passwordHelpBlock" class="form-text">
-                  {{ _('Use at least 8 characters, including uppercase, lowercase, numbers, and symbols.') }}
+                <div class="input-group">
+                  <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+                  <span class="input-group-text" id="togglePassword">
+                    <i class="bi bi-eye-slash" id="eyeIcon"></i>
+                  </span>
                 </div>
-                <div class="progress mt-2" style="height: 6px;">
+
+                <!-- Password rules -->
+                <ul class="list-unstyled small mt-2" id="passwordRules">
+                  <li id="ruleLength" class="text-danger">{{ _('At least 8 characters') }}</li>
+                  <li id="ruleUpper" class="text-danger">{{ _('At least one uppercase letter') }}</li>
+                  <li id="ruleLower" class="text-danger">{{ _('At least one lowercase letter') }}</li>
+                  <li id="ruleNumber" class="text-danger">{{ _('At least one number') }}</li>
+                  <li id="ruleSymbol" class="text-danger">{{ _('At least one symbol') }}</li>
+                </ul>
+
+                <div class="progress mt-2">
                   <div id="passwordStrength" class="progress-bar"></div>
                 </div>
               </div>
@@ -59,63 +111,119 @@
               <!-- Confirm Password -->
               <div class="mb-3">
                 <label class="form-label">{{ _('Confirm Password') }}</label>
-                <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+                <div class="input-group">
+                  <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="••••••••" required>
+                  <span class="input-group-text" id="toggleConfirm">
+                    <i class="bi bi-eye-slash" id="eyeConfirm"></i>
+                  </span>
+                </div>
                 <div id="confirmMessage" class="small mt-1"></div>
               </div>
 
-              <div class="d-grid">
-                <button type="submit" class="btn btn-success">{{ _('Create Owner Account') }}</button>
+              <!-- Submit -->
+              <div class="d-grid mt-4">
+                <button id="submitBtn" type="submit" class="btn btn-success btn-lg shadow-sm" disabled>
+                  <i class="bi bi-person-plus"></i> {{ _('Create Owner Account') }}
+                </button>
               </div>
 
               <div class="text-center mt-3">
-                <small>{{ _('Already have an account?') }} 
+                <small class="text-muted">{{ _('Already have an account?') }} 
                   <a href="{{ url_for('login') }}">{{ _('Login') }}</a>
                 </small>
               </div>
-            </form>
 
+            </form>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Bootstrap & JS -->
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- Password validation -->
+
+  <!-- Password validation & show/hide -->
   <script>
   document.addEventListener('DOMContentLoaded', function() {
     const password = document.getElementById('password');
     const confirm = document.getElementById('confirm_password');
     const confirmMsg = document.getElementById('confirmMessage');
+    const submitBtn = document.getElementById('submitBtn');
     const strengthBar = document.getElementById('passwordStrength');
+    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeConfirm = document.getElementById('eyeConfirm');
 
-    password.addEventListener('input', function() {
+    const rules = {
+      length: document.getElementById('ruleLength'),
+      upper: document.getElementById('ruleUpper'),
+      lower: document.getElementById('ruleLower'),
+      number: document.getElementById('ruleNumber'),
+      symbol: document.getElementById('ruleSymbol')
+    };
+
+    // Password validation
+    function validatePassword() {
       const val = password.value;
       let strength = 0;
 
-      if (val.match(/[a-z]/)) strength++;
-      if (val.match(/[A-Z]/)) strength++;
-      if (val.match(/[0-9]/)) strength++;
-      if (val.match(/[^a-zA-Z0-9]/)) strength++;
-      if (val.length >= 8) strength++;
+      const checks = {
+        length: val.length >= 8,
+        upper: /[A-Z]/.test(val),
+        lower: /[a-z]/.test(val),
+        number: /[0-9]/.test(val),
+        symbol: /[^a-zA-Z0-9]/.test(val)
+      };
+
+      Object.keys(checks).forEach(rule => {
+        rules[rule].className = checks[rule] ? "text-success" : "text-danger";
+        if (checks[rule]) strength++;
+      });
 
       const colors = ["bg-danger", "bg-warning", "bg-info", "bg-primary", "bg-success"];
       strengthBar.className = "progress-bar " + colors[Math.max(strength - 1, 0)];
       strengthBar.style.width = (strength * 20) + "%";
-    });
 
-    confirm.addEventListener('input', function() {
-      if (password.value === confirm.value) {
+      return strength === 5;
+    }
+
+    // Confirm password match
+    function validateConfirm() {
+      if (password.value === confirm.value && confirm.value.length > 0) {
         confirmMsg.textContent = "{{ _('Passwords match!') }}";
         confirmMsg.className = "small text-success";
+        return true;
       } else {
         confirmMsg.textContent = "{{ _('Passwords do not match.') }}";
         confirmMsg.className = "small text-danger";
+        return false;
       }
+    }
+
+    // Enable submit button only when all rules are met
+    function updateSubmit() {
+      submitBtn.disabled = !(validatePassword() && validateConfirm());
+    }
+
+    // Show/hide password toggles
+    document.getElementById('togglePassword').addEventListener('click', () => {
+      const type = password.type === 'password' ? 'text' : 'password';
+      password.type = type;
+      eyeIcon.classList.toggle('bi-eye');
+      eyeIcon.classList.toggle('bi-eye-slash');
     });
+
+    document.getElementById('toggleConfirm').addEventListener('click', () => {
+      const type = confirm.type === 'password' ? 'text' : 'password';
+      confirm.type = type;
+      eyeConfirm.classList.toggle('bi-eye');
+      eyeConfirm.classList.toggle('bi-eye-slash');
+    });
+
+    password.addEventListener('input', updateSubmit);
+    confirm.addEventListener('input', updateSubmit);
   });
   </script>
+
 </body>
 </html>

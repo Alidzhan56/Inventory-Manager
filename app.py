@@ -15,6 +15,9 @@ from flask import g
 
 from flask import session, request 
 
+from flask import render_template, redirect, url_for, flash, request
+from flask_login import login_required, current_user # Assuming you use Flask-Login
+
 
 
 # --- App Setup ---
@@ -222,14 +225,6 @@ def load_user(user_id):
 
 # --- Routes ---
 
-# Index (shows products and add form)
-@app.route('/')
-@login_required
-def index():
-    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
-    products = Product.query.filter_by(owner_id=owner_id).all()
-    warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
-    return render_template('index.html', products=products, warehouses=warehouses, username=current_user.username)
 
 
 @app.route('/add', methods=['POST'])
@@ -656,23 +651,67 @@ def add_user():
     flash('User created successfully!', 'success')
     return redirect(url_for('users'))
 
-
 @app.route('/developer')
 @login_required
 def developer_dashboard():
     if current_user.role != "Developer":
         abort(403)
 
-    return render_template('developer_dashboard.html')
+    users_list = User.query.all()  # Developer sees all users
+    return render_template('developer_dashboard.html', users=users_list)
 
-@app.route('/developer/users')
+
+@app.route('/delete_user_dev/<int:id>')
 @login_required
-def developer_users():
+def delete_user_dev(id):
     if current_user.role != "Developer":
         abort(403)
 
-    users = User.query.all()
-    return render_template('developer_users.html', users=users)
+    user = User.query.get_or_404(id)
+    if user.id == current_user.id:
+        flash(_("You cannot delete your own account!"))
+        return redirect(url_for('developer_dashboard'))
+
+    db.session.delete(user)
+    db.session.commit()
+    flash(_('User %(username)s deleted.') % {'username': user.username})
+    return redirect(url_for('developer_dashboard'))
+
+# --- In your app.py ---
+
+
+
+# ... other imports and app setup ...
+
+# 1. Route for Creating a User
+@app.route('/developer/user/create', methods=['GET', 'POST'])
+@login_required
+def create_user_dev():
+    # Placeholder logic:
+    if request.method == 'POST':
+        # Logic to handle form submission and create a new user in the database
+        flash('User created successfully!', 'success')
+        return redirect(url_for('developer_dashboard'))
+    return render_template('create_user_form.html') # You'd need to create this template
+
+# 2. Route for Viewing System Logs
+@app.route('/developer/logs')
+@login_required
+def view_logs_dev():
+    # Logic to read and display recent application logs
+    logs = ["Log line 1", "Log line 2", "Log line 3"] # Example data
+    return render_template('system_logs.html', logs=logs)
+
+# 3. Route for App Settings
+@app.route('/developer/settings')
+@login_required
+def app_settings_dev():
+    # Logic to load and save general application configuration
+    settings = {'app_name': 'Inventory Manager', 'debug_mode': False} # Example data
+    return render_template('app_settings.html', settings=settings)
+
+# (Ensure your existing 'delete_user_dev' is still defined correctly)
+
 
 # --- User management (Admin only) ---
 @app.route('/users')
@@ -692,41 +731,60 @@ def users():
     # flash(_("You do not have permission to access Users."))
     # return redirect(url_for('index'))
 
-@app.route('/delete_user/<int:id>', methods=['POST'])
+@app.route('/delete_user/<int:id>')
 @login_required
 def delete_user(id):
+
     user = User.query.get_or_404(id)
 
-    # Prevent deleting yourself
-    if user.id == current_user.id:
-        flash(_("You cannot delete your own account!"))
-        return redirect(url_for('users'))
-
-    # Developer: can delete anyone
+    # Developer can delete anyone EXCEPT other developers
     if current_user.role == "Developer":
+        if user.role == "Developer":
+            flash("Developer accounts cannot delete each other.")
+            return redirect(request.referrer)
         db.session.delete(user)
         db.session.commit()
-        flash(_("User %(username)s deleted.") % {'username': user.username})
-        return redirect(url_for('users'))
+        flash(f"User {user.username} deleted.")
+        return redirect(request.referrer)
 
-    # Admin/Owner: can only delete users they created
+    # Admin can delete only users they created
     if current_user.role == "Admin / Owner":
         if user.created_by_id != current_user.id:
-            flash(_("You do not have permission to delete this user."))
+            flash("You can only delete users you created.")
             return redirect(url_for('users'))
-        
+
+        if user.id == current_user.id:
+            flash("You cannot delete your own account.")
+            return redirect(url_for('users'))
+
         db.session.delete(user)
         db.session.commit()
-        flash(_("User %(username)s deleted.") % {'username': user.username})
+        flash(f"User {user.username} deleted.")
         return redirect(url_for('users'))
 
-    # All other roles: blocked
-    flash(_("Unauthorized action."))
-    return redirect(url_for('index'))
+    abort(403)
 
+@app.route('/')
+@login_required
+def index():
+    total_products = Product.query.count()
+    total_warehouses = Warehouse.query.count()
+    total_transactions = Transaction.query.count()
+    total_partners = Partner.query.count()
+    total_users = User.query.count() if current_user.role == 'Admin / Owner' else None
+    recent_transactions = Transaction.query.order_by(Transaction.date.desc()).limit(5).all()
 
+    return render_template('index.html',
+                           total_products=total_products,
+                           total_warehouses=total_warehouses,
+                           total_transactions=total_transactions,
+                           total_partners=total_partners,
+                           total_users=total_users,
+                           recent_transactions=recent_transactions)
 
-# --- Admin / Owner Registration ---
+import re
+from werkzeug.security import generate_password_hash
+
 @app.route('/register_admin', methods=['GET', 'POST'])
 def register_admin():
     if request.method == 'POST':
@@ -743,6 +801,23 @@ def register_admin():
         # Check password match
         if password != confirm_password:
             flash(_('Passwords do not match.'), 'danger')
+            return render_template('register.html')
+
+        # Check password strength
+        if len(password) < 8:
+            flash(_('Password must be at least 8 characters.'), 'danger')
+            return render_template('register.html')
+        if not re.search(r'[A-Z]', password):
+            flash(_('Password must include at least one uppercase letter.'), 'danger')
+            return render_template('register.html')
+        if not re.search(r'[a-z]', password):
+            flash(_('Password must include at least one lowercase letter.'), 'danger')
+            return render_template('register.html')
+        if not re.search(r'\d', password):
+            flash(_('Password must include at least one number.'), 'danger')
+            return render_template('register.html')
+        if not re.search(r'[^a-zA-Z0-9]', password):
+            flash(_('Password must include at least one symbol.'), 'danger')
             return render_template('register.html')
 
         # Check if email or username exists
@@ -765,18 +840,20 @@ def register_admin():
 
     return render_template('register.html')
 
+
 # --- Login/logout ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        identifier = request.form.get('identifier')   # email OR username
+        identifier = request.form.get('identifier')  # email OR username
         password = request.form.get('password')
 
+        # 1️⃣ Check if fields are filled
         if not identifier or not password:
             flash(_('Please fill in all fields.'), 'danger')
             return redirect(url_for('login'))
 
-        # Search by email OR username
+        # 2️⃣ Search user by username OR email
         user = User.query.filter(
             (User.username == identifier) | (User.email == identifier)
         ).first()
@@ -785,12 +862,19 @@ def login():
             flash(_('No account found with that email or username.'), 'danger')
             return redirect(url_for('login'))
 
+        # 3️⃣ Check password
         if not check_password_hash(user.password, password):
             flash(_('Incorrect password.'), 'danger')
             return redirect(url_for('login'))
 
+        # 4️⃣ Log in the user
         login_user(user)
-        return redirect(url_for('index'))
+
+        # 5️⃣ Redirect based on role
+        if user.role == "Developer":
+            return redirect(url_for('developer_dashboard'))  # separate dashboard
+        else:
+            return redirect(url_for('index'))  # normal users
 
     return render_template('login.html')
 
