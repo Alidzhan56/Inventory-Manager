@@ -628,17 +628,33 @@ def transactions():
 @app.route('/add_user', methods=['POST'])
 @login_required
 def add_user():
-    username = request.form.get('username')
-    email = request.form.get('email')  # <--- Must get email!
-    password = request.form.get('password')
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip()
+    password = request.form.get('password', '')
     role = request.form.get('role')
-    
-    # Optional: check if username or email exists
-    if User.query.filter((User.username == username) | (User.email == email)).first():
-        flash('Username or Email already exists.', 'danger')
+
+    # Validate fields
+    if not email or not username or not password:
+        flash("Email, username, and password are required.", "danger")
         return redirect(url_for('users'))
 
+    # Validate password length
+    if len(password) < 8:
+        flash("Password must be at least 8 characters long.", "danger")
+        return redirect(url_for('users'))
+
+    # Check if username or email already exists
+    existing_user = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+
+    if existing_user:
+        flash("Username or Email already exists.", "danger")
+        return redirect(url_for('users'))
+
+    # Secure password hashing
     hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
+
     new_user = User(
         username=username,
         email=email,
@@ -646,10 +662,13 @@ def add_user():
         role=role,
         created_by_id=current_user.id
     )
+
     db.session.add(new_user)
     db.session.commit()
-    flash('User created successfully!', 'success')
+
+    flash("User added successfully!", "success")
     return redirect(url_for('users'))
+
 
 @app.route('/developer')
 @login_required
@@ -661,21 +680,38 @@ def developer_dashboard():
     return render_template('developer_dashboard.html', users=users_list)
 
 
-@app.route('/delete_user_dev/<int:id>')
+@app.route('/delete_user/<int:id>', methods=['POST'])
 @login_required
-def delete_user_dev(id):
-    if current_user.role != "Developer":
-        abort(403)
-
+def delete_user(id):
     user = User.query.get_or_404(id)
-    if user.id == current_user.id:
-        flash(_("You cannot delete your own account!"))
-        return redirect(url_for('developer_dashboard'))
 
-    db.session.delete(user)
-    db.session.commit()
-    flash(_('User %(username)s deleted.') % {'username': user.username})
-    return redirect(url_for('developer_dashboard'))
+    # Developer can delete anyone EXCEPT other developers
+    if current_user.role == "Developer":
+        if user.role == "Developer":
+            flash("Developer accounts cannot delete each other.")
+            return redirect(request.referrer)
+        db.session.delete(user)
+        db.session.commit()
+        flash(f"User {user.username} deleted.")
+        return redirect(request.referrer)
+
+    # Admin can delete only users they created
+    if current_user.role == "Admin / Owner":
+        if user.created_by_id != current_user.id:
+            flash("You can only delete users you created.")
+            return redirect(url_for('users'))
+
+        if user.id == current_user.id:
+            flash("You cannot delete your own account.")
+            return redirect(url_for('users'))
+
+        db.session.delete(user)
+        db.session.commit()
+        flash(f"User {user.username} deleted.")
+        return redirect(url_for('users'))
+
+    abort(403)
+
 
 # --- In your app.py ---
 
@@ -731,56 +767,72 @@ def users():
     # flash(_("You do not have permission to access Users."))
     # return redirect(url_for('index'))
 
-@app.route('/delete_user/<int:id>')
+@app.route('/delete_user_dev/<int:id>', methods=['POST'])
 @login_required
-def delete_user(id):
+def delete_user_dev(id):
+    if current_user.role != "Developer":
+        abort(403)
 
     user = User.query.get_or_404(id)
+    if user.id == current_user.id:
+        flash(_("You cannot delete your own account!"))
+        return redirect(url_for('developer_dashboard'))
 
-    # Developer can delete anyone EXCEPT other developers
-    if current_user.role == "Developer":
-        if user.role == "Developer":
-            flash("Developer accounts cannot delete each other.")
-            return redirect(request.referrer)
-        db.session.delete(user)
-        db.session.commit()
-        flash(f"User {user.username} deleted.")
-        return redirect(request.referrer)
+    db.session.delete(user)
+    db.session.commit()
+    flash(_('User %(username)s deleted.') % {'username': user.username})
+    return redirect(url_for('developer_dashboard'))
 
-    # Admin can delete only users they created
-    if current_user.role == "Admin / Owner":
-        if user.created_by_id != current_user.id:
-            flash("You can only delete users you created.")
-            return redirect(url_for('users'))
-
-        if user.id == current_user.id:
-            flash("You cannot delete your own account.")
-            return redirect(url_for('users'))
-
-        db.session.delete(user)
-        db.session.commit()
-        flash(f"User {user.username} deleted.")
-        return redirect(url_for('users'))
-
-    abort(403)
 
 @app.route('/')
 @login_required
 def index():
+
+    # ─── Dashboard Card Data ──────────────────────
     total_products = Product.query.count()
     total_warehouses = Warehouse.query.count()
     total_transactions = Transaction.query.count()
     total_partners = Partner.query.count()
-    total_users = User.query.count() if current_user.role == 'Admin / Owner' else None
-    recent_transactions = Transaction.query.order_by(Transaction.date.desc()).limit(5).all()
 
-    return render_template('index.html',
-                           total_products=total_products,
-                           total_warehouses=total_warehouses,
-                           total_transactions=total_transactions,
-                           total_partners=total_partners,
-                           total_users=total_users,
-                           recent_transactions=recent_transactions)
+    # ─── Transactions per month (Chart data) ───────
+    from sqlalchemy import extract, func
+    months = []
+    counts = []
+
+    for m in range(1, 13):
+        month_name = datetime(2024, m, 1).strftime("%b")
+        months.append(month_name)
+
+        monthly_count = db.session.query(func.count(Transaction.id))\
+            .filter(extract('month', Transaction.date) == m).scalar() or 0
+
+        counts.append(monthly_count)
+
+    # ─── Product categories (Chart data) ───────────
+    categories = []
+    category_counts = []
+
+    # If you have a category field in Products:
+    category_data = db.session.query(Product.category, func.count(Product.id))\
+        .group_by(Product.category).all()
+
+    for cat, cnt in category_data:
+        categories.append(cat or "Unknown")
+        category_counts.append(cnt)
+
+    # Render template with data
+    return render_template(
+        "index.html",
+        total_products=total_products,
+        total_warehouses=total_warehouses,
+        total_transactions=total_transactions,
+        total_partners=total_partners,
+        transaction_months=months,
+        transaction_counts=counts,
+        product_categories=categories,
+        product_counts=category_counts
+    )
+
 
 import re
 from werkzeug.security import generate_password_hash
@@ -877,6 +929,7 @@ def login():
             return redirect(url_for('index'))  # normal users
 
     return render_template('login.html')
+
 
 
 
