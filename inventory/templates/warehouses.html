@@ -12,7 +12,7 @@
             {{ _('Add New Warehouse') }}
         </div>
         <div class="card-body">
-            <form action="{{ url_for('add_warehouse') }}" method="POST" class="row g-3 align-items-end">
+            <form action="{{ url_for('warehouses.add_warehouse') }}" method="POST" class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label for="name" class="form-label">{{ _('Warehouse Name') }}</label>
                     <input type="text" class="form-control" id="name" name="name" placeholder="{{ _('Enter name') }}" required>
@@ -50,7 +50,7 @@
                         <td>{{ w.name }}</td>
                         <td>{{ w.location or '-' }}</td>
                         <td class="text-end">
-                            <a href="{{ url_for('delete_warehouse', id=w.id) }}" 
+                            <a href="{{ url_for('warehouses.delete_warehouse', id=w.id) }}" 
                                class="btn btn-sm btn-danger">
                                 {{ _('Delete') }}
                             </a>
@@ -68,7 +68,8 @@
 
     <!-- Back Button -->
     <div class="mt-4">
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">{{ _('Back to Products') }}</a>
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary">{{ _('Back to Products') }}</a>
     </div>
 </div>
 {% endblock %}
+

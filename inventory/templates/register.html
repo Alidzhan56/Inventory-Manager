@@ -70,7 +70,7 @@
               {% endif %}
             {% endwith %}
 
-            <form action="{{ url_for('register_admin') }}" method="POST" novalidate>
+            <form action="{{ url_for('auth.register_admin') }}" method="POST" novalidate>
 
               <!-- Email -->
               <div class="mb-3">
@@ -129,7 +129,7 @@
 
               <div class="text-center mt-3">
                 <small class="text-muted">{{ _('Already have an account?') }} 
-                  <a href="{{ url_for('login') }}">{{ _('Login') }}</a>
+                  <a href="{{ url_for('auth.login') }}">{{ _('Login') }}</a>
                 </small>
               </div>
 
@@ -227,3 +227,4 @@
 
 </body>
 </html>
+

@@ -7,7 +7,7 @@
         {{ _('Record Transaction (Sale or Purchase)') }}
     </div>
     <div class="card-body">
-        <form action="{{ url_for('transactions') }}" method="POST" class="row g-3">
+        <form action="{{ url_for('transactions.transactions') }}" method="POST" class="row g-3">
             <div class="col-md-3">
                 <select name="type" class="form-select" required>
                     <option value="">{{ _('Select Type') }}</option>
@@ -92,3 +92,4 @@
     </div>
 </div>
 {% endblock %}
+

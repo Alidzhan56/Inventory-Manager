@@ -99,7 +99,7 @@
             <i class="bi bi-gear-fill me-2"></i> {{ _('Dev Tools') }}
         </a>
         <div class="ms-auto">
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary">
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-box-arrow-right"></i> {{ _('Log Out') }}
             </a>
         </div>
@@ -111,13 +111,13 @@
     <p class="text-muted mb-4">{{ _('You can manage all users and access administrative functions here.') }}</p>
 
     <div class="d-flex justify-content-start gap-3 mb-4 flex-wrap">
-        <a href="{{ url_for('create_user_dev') }}" class="btn btn-success shadow-sm">
+        <a href="{{ url_for('users.create_user_dev') }}" class="btn btn-success shadow-sm">
             <i class="bi bi-person-plus-fill me-1"></i> {{ _('Create New User') }}
         </a>
-        <a href="{{ url_for('view_logs_dev') }}" class="btn btn-outline-info shadow-sm">
+        <a href="{{ url_for('users.view_logs_dev') }}" class="btn btn-outline-info shadow-sm">
             <i class="bi bi-file-earmark-text-fill me-1"></i> {{ _('View System Logs') }}
         </a>
-        <a href="{{ url_for('app_settings_dev') }}" class="btn btn-outline-secondary shadow-sm">
+        <a href="{{ url_for('users.app_settings_dev') }}" class="btn btn-outline-secondary shadow-sm">
             <i class="bi bi-sliders me-1"></i> {{ _('App Settings') }}
         </a>
     </div>
@@ -191,7 +191,7 @@
 </div>
 
 <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true" 
-     data-url-pattern="{{ url_for('delete_user_dev', id=0) }}">
+     data-url-pattern="{{ url_for('users.delete_user_dev', id=0) }}">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">

@@ -20,7 +20,7 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-primary text-white">{{ _('Add Partner') }}</div>
         <div class="card-body">
-            <form method="POST" action="{{ url_for('partners') }}" class="row g-3">
+            <form method="POST" action="{{ url_for('partners.partners') }}" class="row g-3">
                 <div class="col-md-4">
                     <input type="text" name="name" class="form-control" placeholder="{{ _('Partner Name') }}" required>
                 </div>
@@ -75,3 +75,4 @@
 
 </div>
 {% endblock %}
+
