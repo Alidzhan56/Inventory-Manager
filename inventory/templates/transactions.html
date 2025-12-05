@@ -2,94 +2,182 @@
 {% block title %}{{ _('Transactions') }}{% endblock %}
 
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header bg-primary text-white">
-        {{ _('Record Transaction (Sale or Purchase)') }}
+
+<h3 class="fw-bold mb-4">{{ _('Transactions') }}</h3>
+
+<!-- RECORD TRANSACTION CARD -->
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <i class="bi bi-plus-circle me-2 text-primary"></i>{{ _('Record Transaction') }}
     </div>
     <div class="card-body">
-        <form action="{{ url_for('transactions.transactions') }}" method="POST" class="row g-3">
+        <form method="POST">
+
+        <div class="row g-3 align-items-end mb-3">
+
             <div class="col-md-3">
+                <label class="form-label">{{ _('Type') }}</label>
                 <select name="type" class="form-select" required>
-                    <option value="">{{ _('Select Type') }}</option>
-                    <option value="Sale">{{ _('Sale') }}</option>
+                    <option value="">{{ _('Select type') }}</option>
                     <option value="Purchase">{{ _('Purchase') }}</option>
+                    <option value="Sale">{{ _('Sale') }}</option>
                 </select>
             </div>
+
             <div class="col-md-3">
-                <select name="product_id" class="form-select" required>
-                    <option value="">{{ _('Select Product') }}</option>
-                    {% for p in products %}
-                        <option value="{{ p.id }}">{{ p.name }} ({{ p.sku }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
+                <label class="form-label">{{ _('Partner') }}</label>
                 <select name="partner_id" class="form-select" required>
-                    <option value="">{{ _('Select Partner') }}</option>
+                    <option value="">{{ _('Select partner') }}</option>
                     {% for partner in partners %}
-                        <option value="{{ partner.id }}">{{ partner.name }} - {{ partner.type }}</option>
+                        <option value="{{ partner.id }}">{{ partner.name }}</option>
                     {% endfor %}
                 </select>
             </div>
+
             <div class="col-md-3">
+                <label class="form-label">{{ _('Warehouse') }}</label>
                 <select name="warehouse_id" class="form-select" required>
-                    <option value="">{{ _('Select Warehouse') }}</option>
+                    <option value="">{{ _('Select warehouse') }}</option>
                     {% for w in warehouses %}
                         <option value="{{ w.id }}">{{ w.name }}</option>
                     {% endfor %}
                 </select>
             </div>
+
+        </div>
+
+        <div id="products-container" class="mb-3">
+            <div class="row g-3 mb-2 product-row">
+                <div class="col-md-5">
+                    <label class="form-label">{{ _('Product') }}</label>
+                    <select name="product_id[]" class="form-select" required>
+                        <option value="">{{ _('Select product') }}</option>
+                        {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.name }} ({{ p.sku }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{{ _('Quantity') }}</label>
+                    <input type="number" name="quantity[]" min="1" class="form-control" required>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-danger remove-product">×</button>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary mb-3" id="add-product">{{ _('Add Product') }}</button>
+        <div>
+            <button type="submit" class="btn btn-primary">{{ _('Record Transaction') }}</button>
+        </div>
+    </form>
+</div>
+
+
+</div>
+
+<!-- SEARCH & FILTERS -->
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <i class="bi bi-funnel-fill me-2 text-secondary"></i>{{ _('Filter Transactions') }}
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
             <div class="col-md-3">
-                <input type="number" name="quantity" min="1" class="form-control" placeholder="{{ _('Quantity') }}" required>
+                <label class="form-label">{{ _('Type') }}</label>
+                <select name="type" class="form-select">
+                    <option value="">{{ _('All') }}</option>
+                    <option value="Purchase" {% if request.args.get('type')=='Purchase' %}selected{% endif %}>{{ _('Purchase') }}</option>
+                    <option value="Sale" {% if request.args.get('type')=='Sale' %}selected{% endif %}>{{ _('Sale') }}</option>
+                </select>
             </div>
             <div class="col-md-3">
-                <button type="submit" class="btn btn-success w-100">{{ _('Record') }}</button>
+                <label class="form-label">{{ _('Product') }}</label>
+                <select name="product_id" class="form-select">
+                    <option value="">{{ _('All Products') }}</option>
+                    {% for p in products %}
+                        <option value="{{ p.id }}" {% if request.args.get('product_id')==p.id|string %}selected{% endif %}>{{ p.name }} ({{ p.sku }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">{{ _('Partner') }}</label>
+                <select name="partner_id" class="form-select">
+                    <option value="">{{ _('All Partners') }}</option>
+                    {% for partner in partners %}
+                        <option value="{{ partner.id }}" {% if request.args.get('partner_id')==partner.id|string %}selected{% endif %}>{{ partner.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-grid">
+                <label class="form-label opacity-0">Filter</label>
+                <button class="btn btn-outline-primary">{{ _('Apply Filters') }}</button>
             </div>
         </form>
     </div>
 </div>
 
-<div class="card shadow-sm mt-4">
-    <div class="card-header bg-secondary text-white">{{ _('Transaction History') }}</div>
+<!-- TRANSACTION HISTORY TABLE -->
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <i class="bi bi-clock-history me-2 text-secondary"></i>{{ _('Transaction History') }}
+    </div>
     <div class="card-body table-responsive">
         <table class="table table-hover align-middle">
-    <thead>
-        <tr>
-            <th>{{ _('Date') }}</th>
-            <th>{{ _('Product') }}</th>
-            <th>{{ _('Type') }}</th>
-            <th>{{ _('Quantity') }}</th>
-            <th>{{ _('Total Price') }}</th>
-            <th>{{ _('Partner') }}</th>
-            <th>{{ _('Warehouse') }}</th>
-            <th>{{ _('User') }}</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for t in txns %}
-        <tr>
-            <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
-            <td>{{ t.product.name }}</td>
-            <td>
-                {% if t.type == 'Sale' %}
-                    <span class="badge bg-danger">{{ _('Sale') }}</span>
-                {% elif t.type == 'Purchase' %}
-                    <span class="badge bg-success">{{ _('Purchase') }}</span>
-                {% else %}
-                    <span class="badge bg-secondary">{{ t.type or _('Other') }}</span>
-                {% endif %}
-            </td>
-            <td>{{ t.quantity }}</td>
-            <td>{{ t.total_price | round(2) }}</td>
-            <td>{{ t.partner.name if t.partner else '—' }}</td>
-            <td>{{ t.warehouse.name if t.warehouse else '—' }}</td>
-            <td>{{ t.user.username if t.user else '—' }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
+            <thead class="table-light">
+                <tr>
+                    <th>{{ _('Date') }}</th>
+                    <th>{{ _('Product') }}</th>
+                    <th>{{ _('Type') }}</th>
+                    <th>{{ _('Quantity') }}</th>
+                    <th>{{ _('Total Price') }}</th>
+                    <th>{{ _('Partner') }}</th>
+                    <th>{{ _('Warehouse') }}</th>
+                    <th>{{ _('User') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in txns %}
+                <tr>
+                    <td>{{ t.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><i class="bi bi-box-seam text-primary me-1"></i>{{ t.product.name }}</td>
+                    <td>
+                        {% if t.type == 'Purchase' %}
+                            <span class="badge bg-success">{{ _('Purchase') }}</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ _('Sale') }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ t.quantity }}</td>
+                    <td>{{ t.total_price }}</td>
+                    <td>{{ t.partner.name }}</td>
+                    <td>{{ t.warehouse.name }}</td>
+                    <td><i class="bi bi-person"></i> {{ t.user.username }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock %}
 
+<script>
+    const addProductBtn = document.getElementById('add-product');
+    const productsContainer = document.getElementById('products-container');
+
+    addProductBtn.addEventListener('click', () => {
+        const newRow = document.querySelector('.product-row').cloneNode(true);
+        newRow.querySelectorAll('input, select').forEach(el => el.value = '');
+        productsContainer.appendChild(newRow);
+        newRow.querySelector('.remove-product').addEventListener('click', () => newRow.remove());
+    });
+
+    document.querySelectorAll('.remove-product').forEach(btn => {
+        btn.addEventListener('click', e => btn.closest('.product-row').remove());
+    });
+</script>
+
+{% endblock %}
