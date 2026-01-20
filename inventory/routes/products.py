@@ -1,240 +1,302 @@
+# inventory/routes/products.py
+
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import joinedload
 
 from inventory.extensions import db
-from inventory.models import Product, Warehouse, Sale
-from inventory.utils.decorators import roles_required
+from inventory.models import Product, Warehouse, Stock, TransactionItem
 from inventory.utils.translations import _
+from inventory.utils.permissions import has_permission
 
-bp = Blueprint('products', __name__)
+bp = Blueprint("products", __name__)
 
-@bp.route('/products')
+
+def _get_owner_id():
+    """
+    Org logic:
+    - Admin/Owner owns the org
+    - other roles belong to owner via created_by_id
+    - Developer is special (no owner scope), but we avoid letting it create/edit org data accidentally
+    """
+    if current_user.role == "Developer":
+        return None
+    if current_user.role == "Admin / Owner":
+        return current_user.id
+    return current_user.created_by_id
+
+
+def _get_or_create_stock(product_id: int, warehouse_id: int) -> Stock:
+    stock = Stock.query.filter_by(product_id=product_id, warehouse_id=warehouse_id).first()
+    if not stock:
+        stock = Stock(product_id=product_id, warehouse_id=warehouse_id, quantity=0)
+        db.session.add(stock)
+        db.session.flush()
+    return stock
+
+
+@bp.route("/products")
 @login_required
 def products():
-    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
+    if not has_permission(current_user, "products:view"):
+        flash(_("You do not have permission to view products."), "danger")
+        return redirect(url_for("main.index"))
 
-    # Get products visible to this user
-    if current_user.role in ['Admin / Owner', 'Warehouse Manager']:
-        products = Product.query.filter_by(owner_id=owner_id).all()
-    else:
-        products = Product.query.filter_by(owner_id=owner_id).all()
+    owner_id = _get_owner_id()
 
-    warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
+    query = (
+        Product.query
+        .options(joinedload(Product.stocks).joinedload(Stock.warehouse))
+        .order_by(Product.name.asc())
+    )
 
-    return render_template('products.html', products=products, warehouses=warehouses)
+    if owner_id is not None:
+        query = query.filter(Product.owner_id == owner_id)
 
-@bp.route('/add', methods=['POST'])
+    products_list = query.all()
+
+    warehouses_q = Warehouse.query.order_by(Warehouse.name.asc())
+    if owner_id is not None:
+        warehouses_q = warehouses_q.filter(Warehouse.owner_id == owner_id)
+    warehouses = warehouses_q.all()
+
+    return render_template("products.html", products=products_list, warehouses=warehouses)
+
+
+@bp.route("/add", methods=["POST"])
 @login_required
 def add_product():
-    redirect_page = 'products.products'
+    if not has_permission(current_user, "products:create"):
+        flash(_("You do not have permission to add products."), "danger")
+        return redirect(url_for("products.products"))
 
-    name = request.form.get('name')
-    sku = request.form.get('sku')
-    category = request.form.get('category')
-    warehouse_id = request.form.get('warehouse_id')
-    image_file = request.files.get('image')
+    owner_id = _get_owner_id()
 
-    # Safe conversions
+    # Avoid creating "ownerless" data
+    if owner_id is None:
+        flash(_("Developer must add products from an owner context."), "warning")
+        return redirect(url_for("products.products"))
+
+    name = (request.form.get("name") or "").strip()
+    sku = (request.form.get("sku") or "").strip()
+    category = (request.form.get("category") or "").strip() or None
+    warehouse_id = request.form.get("warehouse_id")
+    image_file = request.files.get("image")
+
+    # safe conversions
     try:
-        quantity = int(request.form.get('quantity', 0))
-    except ValueError:
+        quantity = int(request.form.get("quantity", 0))
+    except (ValueError, TypeError):
         quantity = 0
-    try:
-        price = float(request.form.get('price', 0))
-    except ValueError:
-        price = 0.0
 
-    owner_id = current_user.id if current_user.role == 'Admin / Owner' else current_user.created_by_id
+    try:
+        purchase_price = float(request.form.get("purchase_price", 0) or 0)
+    except (ValueError, TypeError):
+        purchase_price = 0.0
+
+    try:
+        sell_price = float(request.form.get("sell_price", 0) or 0)
+    except (ValueError, TypeError):
+        sell_price = 0.0
+
+    if not name:
+        flash(_("Please provide product name."), "danger")
+        return redirect(url_for("products.products"))
+
+    if not sku:
+        flash(_("Please provide SKU."), "danger")
+        return redirect(url_for("products.products"))
 
     if not warehouse_id:
-        flash(_("Please select a warehouse."))
-        return redirect(url_for(redirect_page))
+        flash(_("Please select a warehouse."), "danger")
+        return redirect(url_for("products.products"))
 
-    # Ensure warehouse_id is int
     try:
         warehouse_id = int(warehouse_id)
     except ValueError:
-        flash(_("Invalid warehouse selected."))
-        return redirect(url_for(redirect_page))
+        flash(_("Invalid warehouse selected."), "danger")
+        return redirect(url_for("products.products"))
 
-    if not sku:
-        flash(_("Please provide SKU."))
-        return redirect(url_for(redirect_page))
+    # make sure warehouse belongs to this org
+    warehouse = Warehouse.query.filter_by(id=warehouse_id, owner_id=owner_id).first()
+    if not warehouse:
+        flash(_("Invalid warehouse selected."), "danger")
+        return redirect(url_for("products.products"))
 
-    # Check if SKU exists
-    existing = Product.query.filter_by(sku=sku, owner_id=owner_id, warehouse_id=warehouse_id).first()
-
-    if existing:
-        warehouses = Warehouse.query.filter_by(owner_id=owner_id).all()
-        products = Product.query.filter_by(owner_id=owner_id).all()
-        new_product_data = {
-            "name": name,
-            "quantity": quantity,
-            "price": price,
-            "sku": sku,
-            "category": category,
-            "warehouse_id": warehouse_id,
-            "image_file": image_file.filename if image_file else None
-        }
-        return render_template(
-            'products.html',
-            show_merge_modal=True,
-            existing_product=existing,
-            new_product_data=new_product_data,
-            warehouses=warehouses,
-            products=products
-        )
-
-    # Handle image
+    # handle image
     image_relpath = None
-    if image_file and image_file.filename != '':
-        filename = secure_filename(image_file.filename)
-        image_file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
-        image_relpath = f"uploads/{filename}"
-
-    # Create new
-    new_product = Product(
-        name=name,
-        quantity=quantity,
-        price=price,
-        sku=sku,
-        category=category,
-        image=image_relpath,
-        owner_id=owner_id,
-        warehouse_id=warehouse_id
-    )
-
-    db.session.add(new_product)
-    db.session.commit()
-    flash(_("Product '%(name)s' added successfully!") % {'name': name})
-    return redirect(url_for(redirect_page))
-
-@bp.route('/merge_product', methods=['POST'])
-@login_required
-def merge_product():
-    existing_id = request.form.get('existing_id')
-    add_qty = request.form.get('add_qty', type=int)
-
-    existing = Product.query.get(existing_id)
-    if not existing:
-        flash(_("Product not found."), "danger")
-        return redirect(url_for('products.products'))
-
-    existing.quantity += add_qty
-    db.session.commit()
-
-    flash(_("Quantity successfully merged for %(name)s (new total: %(qty)d).") % 
-          {'name': existing.name, 'qty': existing.quantity}, "success")
-
-    return redirect(url_for('products.products'))
-
-@bp.route('/sell/<int:id>', methods=['POST'])
-@login_required
-def sell_product(id):
-    product = Product.query.get_or_404(id)
-    try:
-        quantity_to_sell = int(request.form.get('quantity', 0))
-    except ValueError:
-        quantity_to_sell = 0
-
-    if quantity_to_sell <= 0:
-        flash(_("Invalid quantity."))
-        return redirect(url_for('main.index'))
-
-    if quantity_to_sell > product.quantity:
-        flash(_("Not enough stock to sell that quantity."))
-        return redirect(url_for('main.index'))
-
-    # Decrease product stock
-    product.quantity -= quantity_to_sell
-
-    # Record sale
-    total_price = quantity_to_sell * (product.price or 0)
-    sale = Sale(
-        product_id=product.id,
-        quantity=quantity_to_sell,
-        total_price=total_price,
-        warehouse_id=product.warehouse_id
-    )
-    db.session.add(sale)
-    db.session.commit()
-
-    flash(_("Sold %(qty)s of '%(name)s'. Remaining stock: %(rem)s.") % 
-          {'qty': quantity_to_sell, 'name': product.name, 'rem': product.quantity})
-    return redirect(url_for('main.index'))
-
-@bp.route('/edit/<int:id>', methods=['POST'])
-@login_required
-def edit_product(id):
-    product = Product.query.get_or_404(id)
-
-    # Ensure current user can edit this product
-    owner_allowed = (
-        (current_user.role == 'Admin / Owner' and product.owner_id == current_user.id) or
-        (current_user.role != 'Admin / Owner' and product.owner_id == current_user.created_by_id)
-    )
-    if not owner_allowed:
-        abort(403)
-
-    # Get form fields safely
-    product.name = request.form.get('name', product.name)
-    product.category = request.form.get('category', product.category)
-    warehouse_id = request.form.get('warehouse_id')
-
-    try:
-        product.quantity = int(request.form.get('quantity', product.quantity))
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        product.price = float(request.form.get('price', product.price))
-    except (ValueError, TypeError):
-        pass
-
-    new_sku = request.form.get('sku', product.sku)
-    if new_sku != product.sku:
-        conflict = Product.query.filter_by(
-            sku=new_sku,
-            owner_id=product.owner_id,
-            warehouse_id=warehouse_id
-        ).first()
-        if conflict and conflict.id != product.id:
-            flash(_("Another product with the same SKU exists in this warehouse."), 'warning')
-            return redirect(url_for('products.products'))
-        product.sku = new_sku
-
-    try:
-        product.warehouse_id = int(warehouse_id) if warehouse_id else None
-    except (ValueError, TypeError):
-        pass
-
-    # Handle image upload
-    image_file = request.files.get('image')
     if image_file and image_file.filename:
         filename = secure_filename(image_file.filename)
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        os.makedirs(current_app.config["UPLOAD_FOLDER"], exist_ok=True)
+        image_file.save(os.path.join(current_app.config["UPLOAD_FOLDER"], filename))
+        image_relpath = f"uploads/{filename}"
+
+    # SKU unique per owner
+    existing = Product.query.filter_by(sku=sku, owner_id=owner_id).first()
+    if existing:
+        # product exists => just add stock for this warehouse
+        stock = _get_or_create_stock(existing.id, warehouse_id)
+        stock.quantity = (stock.quantity or 0) + max(quantity, 0)
+
+        # update defaults if given
+        existing.default_purchase_price = purchase_price
+        existing.default_sell_price = sell_price
+        if category:
+            existing.category = category
+        if image_relpath:
+            existing.image = image_relpath
+
+        # legacy sync (temporary)
+        existing.quantity = sum((s.quantity or 0) for s in existing.stocks)
+
+        db.session.commit()
+        flash(_("Product already exists. Stock was added to the selected warehouse."), "success")
+        return redirect(url_for("products.products"))
+
+    # create new product (global per owner)
+    new_product = Product(
+        name=name,
+        sku=sku,
+        category=category,
+        default_purchase_price=purchase_price,
+        default_sell_price=sell_price,
+        image=image_relpath,
+        owner_id=owner_id,
+        warehouse_id=warehouse_id,  # legacy field, keep for now
+    )
+    db.session.add(new_product)
+    db.session.flush()
+
+    stock = _get_or_create_stock(new_product.id, warehouse_id)
+    stock.quantity = (stock.quantity or 0) + max(quantity, 0)
+
+    # legacy sync (temporary)
+    new_product.quantity = sum((s.quantity or 0) for s in new_product.stocks)
+
+    db.session.commit()
+    flash(_("Product '%(name)s' added successfully!") % {"name": name}, "success")
+    return redirect(url_for("products.products"))
+
+
+@bp.route("/edit/<int:id>", methods=["POST"])
+@login_required
+def edit_product(id):
+    if not has_permission(current_user, "products:edit"):
+        flash(_("You do not have permission to edit products."), "danger")
+        return redirect(url_for("products.products"))
+
+    owner_id = _get_owner_id()
+
+    if owner_id is None:
+        flash(_("Developer must edit products from an owner context."), "warning")
+        return redirect(url_for("products.products"))
+
+    product = Product.query.filter_by(id=id, owner_id=owner_id).first_or_404()
+
+    # basic fields
+    product.name = (request.form.get("name") or product.name).strip()
+    product.sku = (request.form.get("sku") or product.sku).strip()
+    product.category = (request.form.get("category") or "").strip() or None
+
+    # prices
+    try:
+        product.default_purchase_price = float(
+            request.form.get("purchase_price", product.default_purchase_price) or 0
+        )
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        product.default_sell_price = float(
+            request.form.get("sell_price", product.default_sell_price) or 0
+        )
+    except (ValueError, TypeError):
+        pass
+
+    # SKU conflict check per owner
+    conflict = Product.query.filter(
+        Product.owner_id == owner_id,
+        Product.sku == product.sku,
+        Product.id != product.id,
+    ).first()
+    if conflict:
+        flash(_("Another product with the same SKU already exists."), "warning")
+        return redirect(url_for("products.products"))
+
+    # optional: set stock for a specific warehouse
+    warehouse_id = request.form.get("warehouse_id")
+    stock_qty = request.form.get("stock_qty")
+
+    if warehouse_id:
+        try:
+            warehouse_id = int(warehouse_id)
+        except ValueError:
+            warehouse_id = None
+
+    if warehouse_id:
+        wh = Warehouse.query.filter_by(id=warehouse_id, owner_id=owner_id).first()
+        if not wh:
+            flash(_("Invalid warehouse selected."), "danger")
+            return redirect(url_for("products.products"))
+
+        if stock_qty is not None and stock_qty != "":
+            try:
+                stock_qty = int(stock_qty)
+            except (ValueError, TypeError):
+                stock_qty = None
+
+            if stock_qty is not None and stock_qty >= 0:
+                stock = _get_or_create_stock(product.id, warehouse_id)
+                stock.quantity = stock_qty
+                product.warehouse_id = warehouse_id  # legacy pointer
+
+    # image upload (optional)
+    image_file = request.files.get("image")
+    if image_file and image_file.filename:
+        filename = secure_filename(image_file.filename)
+        os.makedirs(current_app.config["UPLOAD_FOLDER"], exist_ok=True)
+        filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
         image_file.save(filepath)
         product.image = f"uploads/{filename}"
 
+    # legacy sync (temporary)
+    product.quantity = sum((s.quantity or 0) for s in product.stocks)
+
     db.session.commit()
+    flash(_("Product '%(name)s' updated successfully!") % {"name": product.name}, "success")
+    return redirect(url_for("products.products"))
 
-    flash(_("Product '%(name)s' updated successfully!") % {'name': product.name}, 'success')
-    return redirect(url_for('products.products'))
 
-@bp.route('/delete/<int:id>')
+@bp.route("/delete/<int:id>", methods=["POST"])
 @login_required
-@roles_required('Admin / Owner', 'Warehouse Manager')
 def delete_product(id):
-    product = Product.query.get_or_404(id)
+    if not has_permission(current_user, "products:delete"):
+        flash(_("You do not have permission to delete products."), "danger")
+        return redirect(url_for("products.products"))
 
-    owner_allowed = (current_user.role == 'Admin / Owner' and product.owner_id == current_user.id) or \
-                    (current_user.role != 'Admin / Owner' and product.owner_id == current_user.created_by_id)
-    if not owner_allowed:
-        abort(403)
+    owner_id = _get_owner_id()
+
+    if owner_id is None:
+        flash(_("Developer must delete products from an owner context."), "warning")
+        return redirect(url_for("products.products"))
+
+    product = Product.query.filter_by(id=id, owner_id=owner_id).first_or_404()
+
+    # Safety checks: don't delete if product has stock or has transactions
+    has_stock = any((s.quantity or 0) > 0 for s in product.stocks)
+    if has_stock:
+        flash(_("Cannot delete this product because it still has stock."), "warning")
+        return redirect(url_for("products.products"))
+
+    used_in_txn = TransactionItem.query.filter_by(product_id=product.id).first() is not None
+    if used_in_txn:
+        flash(_("Cannot delete this product because it is used in transactions."), "warning")
+        return redirect(url_for("products.products"))
 
     db.session.delete(product)
     db.session.commit()
-    flash(_("Product '%(name)s' deleted.") % {'name': product.name})
-    return redirect(url_for('main.index'))
+
+    flash(_("Product '%(name)s' deleted.") % {"name": product.name}, "success")
+    return redirect(url_for("products.products"))

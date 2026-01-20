@@ -1,37 +1,76 @@
-{% extends 'base.html' %}
-{% block title %}{{ _('Settings') }}{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ _('Settings') }} · WarePulse{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2>{{ _('⚙️ Settings') }}</h2>
-    <form method="POST" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label for="company_name" class="form-label">{{ _('Company Name') }}</label>
-            <input type="text" name="company_name" id="company_name" class="form-control" 
-                   value="{{ config.company_name }}">
+<div class="container-fluid">
+
+  <div class="mb-4">
+    <h3 class="fw-bold mb-0">{{ _('Settings') }}</h3>
+    <div class="text-muted mt-1">{{ _('Manage company preferences and inventory rules.') }}</div>
+  </div>
+
+  <form method="POST" class="card shadow-sm border-0">
+    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+      <i class="bi bi-gear me-2 text-primary"></i>{{ _('Company Settings') }}
+    </div>
+
+    <div class="card-body">
+      <div class="row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">{{ _('Company Name') }}</label>
+          <input type="text" name="company_name" class="form-control" value="{{ config.company_name }}" required>
         </div>
 
-        <div class="mb-3">
-            <label for="logo" class="form-label">{{ _('Company Logo') }}</label>
-            {% if config.logo_path %}
-                <div class="mb-2">
-                    <img src="{{ url_for('static', filename=config.logo_path.split('static/')[-1]) }}" 
-                         alt="{{ _('Company Logo') }}" height="100">
-                </div>
-            {% endif %}
-            <input type="file" name="logo" id="logo" class="form-control">
+        <div class="col-md-3">
+          <label class="form-label">{{ _('Currency') }}</label>
+          <select name="currency" class="form-select">
+            <option value="EUR" {% if config.currency == 'EUR' %}selected{% endif %}>EUR</option>
+            <option value="USD" {% if config.currency == 'USD' %}selected{% endif %}>USD</option>
+          </select>
         </div>
 
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="notifications_enabled" id="notifications_enabled"
+        <div class="col-md-3">
+          <label class="form-label">{{ _('Default Language') }}</label>
+          <select name="default_language" class="form-select">
+            <option value="en" {% if config.default_language == 'en' %}selected{% endif %}>English</option>
+            <option value="bg" {% if config.default_language == 'bg' %}selected{% endif %}>Български</option>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">{{ _('Low Stock Threshold') }}</label>
+          <input type="number" min="0" name="low_stock_threshold" class="form-control"
+                 value="{{ config.low_stock_threshold if config.low_stock_threshold is not none else 5 }}">
+          <div class="form-text">
+            {{ _('Products at or below this quantity will show up in Low Stock.') }}
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">{{ _('Notifications') }}</label>
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="notifications_enabled" id="notifSwitch"
                    {% if config.notifications_enabled %}checked{% endif %}>
-            <label class="form-check-label" for="notifications_enabled">
-                {{ _('Enable Notifications') }}
+            <label class="form-check-label" for="notifSwitch">
+              {{ _('Enable notifications') }}
             </label>
+          </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">{{ _('Save Changes') }}</button>
-    </form>
+      </div>
+    </div>
+
+    <div class="card-footer bg-white d-flex gap-2">
+      <button class="btn btn-primary">
+        <i class="bi bi-check2-circle me-1"></i>{{ _('Save Changes') }}
+      </button>
+      <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+        {{ _('Cancel') }}
+      </a>
+    </div>
+  </form>
+
 </div>
 {% endblock %}
-

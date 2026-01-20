@@ -1,0 +1,477 @@
+{# templates/landing.html #}
+{% extends "base.html" %}
+{% block title %}{{ _('WarePulse') }} · {{ _('Inventory & Transactions') }}{% endblock %}
+
+{% block content %}
+<style>
+  /* ===== Landing page only styles ===== */
+  .landing-wrap {
+    margin-left: 0 !important; /* landing should be full width even if sidebar exists */
+    padding: 0 !important;
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    background:
+      radial-gradient(900px 500px at 10% 15%, rgba(13,110,253,0.25), transparent 60%),
+      radial-gradient(700px 420px at 85% 20%, rgba(25,135,84,0.18), transparent 55%),
+      radial-gradient(600px 420px at 60% 90%, rgba(255,193,7,0.14), transparent 55%),
+      linear-gradient(180deg, #0b1220 0%, #0a1020 100%);
+    box-shadow: 0 28px 70px rgba(15, 23, 42, 0.35);
+  }
+
+  .hero::before, .hero::after {
+    content: "";
+    position: absolute;
+    width: 520px;
+    height: 520px;
+    border-radius: 999px;
+    filter: blur(0px);
+    opacity: 0.35;
+    pointer-events: none;
+    transform: translate3d(0,0,0);
+    animation: floaty 10s ease-in-out infinite;
+  }
+
+  .hero::before {
+    top: -240px;
+    left: -180px;
+    background: radial-gradient(circle at 30% 30%, rgba(13,110,253,0.55), transparent 55%);
+  }
+
+  .hero::after {
+    bottom: -260px;
+    right: -220px;
+    background: radial-gradient(circle at 30% 30%, rgba(25,135,84,0.45), transparent 55%);
+    animation-delay: 1.5s;
+  }
+
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+    50% { transform: translateY(18px) translateX(10px) scale(1.02); }
+  }
+
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    padding: 54px 28px;
+  }
+
+  @media (min-width: 992px) {
+    .hero-inner { padding: 70px 56px; }
+  }
+
+  .badge-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.86);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(6px);
+    font-weight: 650;
+    letter-spacing: 0.2px;
+    transition: transform .2s ease, background .2s ease;
+  }
+
+  .badge-soft:hover { transform: translateY(-1px); background: rgba(255,255,255,0.10); }
+
+  .hero-title {
+    color: #fff;
+    font-weight: 850;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    font-size: clamp(2.1rem, 4vw, 3.35rem);
+    margin: 14px 0 12px;
+  }
+
+  .hero-sub {
+    color: rgba(255,255,255,0.78);
+    font-size: 1.08rem;
+    line-height: 1.55;
+    max-width: 60ch;
+  }
+
+  .hero-cta .btn {
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 700;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .hero-cta .btn:hover { transform: translateY(-1px); box-shadow: 0 16px 26px rgba(0,0,0,0.25); }
+
+  .hero-metrics {
+    margin-top: 22px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .hero-metrics { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .metric {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px;
+    padding: 14px 16px;
+    backdrop-filter: blur(8px);
+    transition: transform .18s ease, background .18s ease, border-color .18s ease;
+  }
+  .metric:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .metric .label { color: rgba(255,255,255,0.70); font-size: .86rem; }
+  .metric .value { color: #fff; font-weight: 850; font-size: 1.15rem; margin-top: 2px; }
+
+  .section-title {
+    font-weight: 850;
+    letter-spacing: -0.03em;
+  }
+
+  .feature-card {
+    border-radius: 18px;
+    border: 1px solid rgba(15,23,42,0.08);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    overflow: hidden;
+    background: #fff;
+  }
+  .feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
+    border-color: rgba(13,110,253,0.18);
+  }
+
+  .feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13,110,253,0.10);
+    border: 1px solid rgba(13,110,253,0.18);
+  }
+
+  .workflow-step {
+    background: #fff;
+    border: 1px solid rgba(15,23,42,0.08);
+    border-radius: 18px;
+    padding: 16px;
+    transition: transform .16s ease, box-shadow .16s ease;
+  }
+  .workflow-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 35px rgba(15,23,42,0.10);
+  }
+
+  .cta-strip {
+    border-radius: 22px;
+    background: linear-gradient(90deg, rgba(13,110,253,0.14), rgba(25,135,84,0.10));
+    border: 1px solid rgba(15,23,42,0.08);
+    padding: 22px;
+  }
+
+  .landing-footer {
+    margin-top: 40px;
+    border-top: 1px solid rgba(15,23,42,0.08);
+    padding-top: 22px;
+  }
+
+  /* Smooth fade-in on load */
+  .fade-in-up {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: fadeUp .7s ease forwards;
+  }
+  .fade-delay-1 { animation-delay: .05s; }
+  .fade-delay-2 { animation-delay: .12s; }
+  .fade-delay-3 { animation-delay: .20s; }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="landing-wrap">
+  <div class="container py-4 py-lg-5">
+
+    <!-- HERO -->
+    <div class="hero fade-in-up fade-delay-1">
+      <div class="hero-inner">
+        <div class="badge-soft">
+          <i class="bi bi-lightning-charge-fill text-warning"></i>
+          <span>{{ _('Modern Inventory & Transaction Management') }}</span>
+        </div>
+
+        <div class="row align-items-center g-4 mt-2">
+          <div class="col-lg-7">
+            <h1 class="hero-title">
+              {{ _('Track stock, record sales & purchases, and stay in control.') }}
+            </h1>
+
+            <p class="hero-sub mb-4">
+              {{ _('WarePulse helps small and medium businesses manage products, warehouses, partners, and transactions in one clean dashboard — fast, simple, and role-based.') }}
+            </p>
+
+            <div class="hero-cta d-flex flex-column flex-sm-row gap-2">
+              <a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}">
+                <i class="bi bi-box-arrow-in-right me-2"></i>{{ _('Login') }}
+              </a>
+
+              <a class="btn btn-outline-light btn-lg" href="{{ url_for('auth.register_admin') }}">
+                <i class="bi bi-person-plus me-2"></i>{{ _('Create Company Account') }}
+              </a>
+            </div>
+
+            <div class="hero-metrics mt-4">
+              <div class="metric">
+                <div class="label">{{ _('Role-based access') }}</div>
+                <div class="value">{{ _('Admin, Manager, Sales') }}</div>
+              </div>
+              <div class="metric">
+                <div class="label">{{ _('Stock per warehouse') }}</div>
+                <div class="value">{{ _('Clear visibility') }}</div>
+              </div>
+              <div class="metric">
+                <div class="label">{{ _('Fast transactions') }}</div>
+                <div class="value">{{ _('Multi-line forms') }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <!-- “App preview” card (fake UI) -->
+            <div class="card border-0 shadow-lg" style="border-radius: 22px; overflow:hidden;">
+              <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                <div class="fw-bold"><i class="bi bi-speedometer2 me-2 text-primary"></i>{{ _('Dashboard Preview') }}</div>
+                <span class="badge text-bg-light">{{ _('Live overview') }}</span>
+              </div>
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <div class="text-muted small">{{ _('Today') }}</div>
+                  <div class="small fw-semibold"><i class="bi bi-shield-check text-success me-1"></i>{{ _('Secure sessions') }}</div>
+                </div>
+
+                <div class="row g-2">
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border">
+                      <div class="text-muted small">{{ _('Products') }}</div>
+                      <div class="fs-4 fw-bold">—</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border">
+                      <div class="text-muted small">{{ _('Warehouses') }}</div>
+                      <div class="fs-4 fw-bold">—</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border">
+                      <div class="text-muted small">{{ _('Transactions') }}</div>
+                      <div class="fs-4 fw-bold">—</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 rounded-4 border">
+                      <div class="text-muted small">{{ _('Partners') }}</div>
+                      <div class="fs-4 fw-bold">—</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-3 p-3 rounded-4" style="background: rgba(13,110,253,0.06); border: 1px solid rgba(13,110,253,0.12);">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle text-primary"></i>
+                    <div class="small">
+                      {{ _('After login, you’ll see analytics, low-stock alerts, and your latest transactions.') }}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="mt-5 fade-in-up fade-delay-2">
+      <div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <h2 class="section-title mb-1">{{ _('Everything you need to run inventory') }}</h2>
+          <div class="text-muted">{{ _('A practical workflow for real businesses — not just a demo.') }}</div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-box-seam text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Product & stock management') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Central product catalog with per-warehouse stock so you always know what is available.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-arrow-left-right text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Purchases & sales') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Multi-line transactions with automatic stock updates and clean history tracking.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-people text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Partners') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Customers and suppliers in one place, connected directly to your transactions.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-shield-lock text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Role-based access') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Admins manage everything, warehouse managers handle stock, sales agents record sales only.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-graph-up-arrow text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Dashboard insights') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Track trends, see totals, and keep an eye on activity with clear charts.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card p-4 h-100">
+            <div class="feature-icon mb-3"><i class="bi bi-translate text-primary fs-5"></i></div>
+            <div class="fw-bold fs-5">{{ _('Multilingual ready') }}</div>
+            <div class="text-muted mt-2">
+              {{ _('Switch languages instantly with your JSON translation system.') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORKFLOW -->
+    <div class="mt-5 fade-in-up fade-delay-3">
+      <h2 class="section-title mb-3">{{ _('How it works') }}</h2>
+
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="workflow-step h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge text-bg-primary">1</span>
+              <div class="fw-bold">{{ _('Create your company') }}</div>
+            </div>
+            <div class="text-muted">
+              {{ _('Register an Admin account and set your company settings in minutes.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="workflow-step h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge text-bg-primary">2</span>
+              <div class="fw-bold">{{ _('Add warehouses & products') }}</div>
+            </div>
+            <div class="text-muted">
+              {{ _('Organize items by warehouse, keep quantities accurate, and update prices easily.') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="workflow-step h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge text-bg-primary">3</span>
+              <div class="fw-bold">{{ _('Record transactions') }}</div>
+            </div>
+            <div class="text-muted">
+              {{ _('Purchases increase stock, sales decrease stock — everything is stored in your history.') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA strip -->
+      <div class="cta-strip mt-4 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div>
+          <div class="fw-bold fs-5">{{ _('Ready to get started?') }}</div>
+          <div class="text-muted">{{ _('Login to your workspace or create a new company account.') }}</div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-primary" href="{{ url_for('auth.login') }}">
+            <i class="bi bi-box-arrow-in-right me-1"></i>{{ _('Login') }}
+          </a>
+          <a class="btn btn-outline-primary" href="{{ url_for('auth.register_admin') }}">
+            <i class="bi bi-person-plus me-1"></i>{{ _('Register') }}
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="landing-footer">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-6">
+          <div class="fw-bold">WarePulse</div>
+          <div class="text-muted small">
+            {{ _('Inventory & Transaction Management System') }}
+          </div>
+        </div>
+
+        <div class="col-md-6 text-md-end">
+          <div class="d-flex justify-content-md-end gap-3">
+            <a class="text-decoration-none text-muted" href="#"><i class="bi bi-facebook"></i> Facebook</a>
+            <a class="text-decoration-none text-muted" href="#"><i class="bi bi-instagram"></i> Instagram</a>
+            <a class="text-decoration-none text-muted" href="#"><i class="bi bi-linkedin"></i> LinkedIn</a>
+          </div>
+          <div class="mt-2 small text-muted">
+            <a class="text-decoration-none text-muted me-3" href="#">{{ _('Terms') }}</a>
+            <a class="text-decoration-none text-muted me-3" href="#">{{ _('Privacy') }}</a>
+            <a class="text-decoration-none text-muted" href="#">{{ _('Contact') }}</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center text-muted small mt-3">
+        © {{ (g.app_config.company_name if g.app_config else 'WarePulse') }} · {{ _('All rights reserved.') }}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Landing page should not show sidebar spacing if user is logged in.
+  // We keep it simple: remove desktop left margin by adding a class on main container.
+  // (Your base layout uses margin-left for authenticated sidebar.)
+  document.addEventListener("DOMContentLoaded", () => {
+    const main = document.querySelector(".main-content");
+    if (main) main.classList.add("landing-wrap");
+  });
+</script>
+{% endblock %}

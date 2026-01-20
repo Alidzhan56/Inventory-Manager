@@ -6,43 +6,66 @@ from inventory.extensions import db, login_manager
 from inventory.models import User, AppConfig
 from inventory.utils.translations import set_language, _
 
+
 def create_app(config_name='default'):
     """Application factory"""
     app = Flask(__name__)
-    
+
     # Load configuration
     app.config.from_object(config[config_name])
-    
+
     # Create upload folder
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    
+
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
-    
+
     # User loader for Flask-Login
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
-    
-    # Before request: set language and load company settings
+
+    # Before request: language + org config
     @app.before_request
     def before_request():
         set_language(app)
-        
-        config_obj = AppConfig.query.first()
+
+        # default: nothing loaded
+        g.app_config = None
+
+        # if user not logged in, we can't know the company
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return
+
+        # find the organization owner
+        owner_id = current_user.id if current_user.role == "Admin / Owner" else current_user.created_by_id
+        if not owner_id:
+            return
+
+        # load config for that owner, or create it if missing
+        config_obj = AppConfig.query.filter_by(owner_id=owner_id).first()
         if not config_obj:
-            config_obj = AppConfig(company_name=_("Inventory Manager"), notifications_enabled=True)
+            config_obj = AppConfig(
+                owner_id=owner_id,
+                company_name=_("Inventory Manager"),
+                notifications_enabled=True,
+                low_stock_threshold=5,
+                default_language="en",
+                currency="BGN",
+            )
             db.session.add(config_obj)
             db.session.commit()
+
         g.app_config = config_obj
-    
+
     # Make translation function available in templates
     app.jinja_env.globals.update(_=_)
-    
+
     # Register blueprints
-    from inventory.routes import auth, products, warehouses, partners, transactions, users, settings, main
-    
+    from inventory.routes import auth, products, warehouses, partners, transactions, users, settings, main, reports
+
     app.register_blueprint(auth.bp)
     app.register_blueprint(products.bp)
     app.register_blueprint(warehouses.bp)
@@ -51,9 +74,11 @@ def create_app(config_name='default'):
     app.register_blueprint(users.bp)
     app.register_blueprint(settings.bp)
     app.register_blueprint(main.bp)
-    
+    app.register_blueprint(reports.bp)
+
+
     # Create database tables
     with app.app_context():
         db.create_all()
-    
+
     return app

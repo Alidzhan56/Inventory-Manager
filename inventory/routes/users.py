@@ -1,3 +1,5 @@
+# inventory/routes/users.py
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
@@ -5,141 +7,242 @@ from werkzeug.security import generate_password_hash
 from inventory.extensions import db
 from inventory.models import User
 from inventory.utils.translations import _
+from inventory.utils.permissions import has_permission
 
-bp = Blueprint('users', __name__)
+bp = Blueprint("users", __name__)
 
-@bp.route('/users')
+
+def _get_owner_id():
+    """
+    Owner scoping logic used in your app:
+    - Admin/Owner owns the org
+    - other roles belong to owner via created_by_id
+    - Developer is special (no owner scope)
+    """
+    if current_user.role == "Developer":
+        return None
+    if current_user.role == "Admin / Owner":
+        return current_user.id
+    return current_user.created_by_id
+
+
+def _is_org_admin(user: User) -> bool:
+    return (user.role or "").strip() == "Admin / Owner"
+
+
+def _is_in_same_org(target: User, owner_id: int) -> bool:
+    # Org members are: owner (id == owner_id) + any user created_by_id == owner_id
+    return (target.id == owner_id) or (target.created_by_id == owner_id)
+
+
+@bp.route("/users")
 @login_required
 def users():
-    # Developer: can see all users
+    if not has_permission(current_user, "users:view"):
+        flash(_("You do not have permission to manage users."), "danger")
+        return redirect(url_for("main.index"))
+
+    q = (request.args.get("q") or "").strip()
+    r = (request.args.get("role") or "").strip()
+
+    # Developer sees everything
     if current_user.role == "Developer":
-        users_list = User.query.all()
-        return render_template('users.html', users=users_list)
+        query = User.query
+        if q:
+            query = query.filter((User.username.ilike(f"%{q}%")) | (User.email.ilike(f"%{q}%")))
+        if r:
+            query = query.filter(User.role == r)
 
-    # Admin/Owner: can see only users they created
-    if current_user.role == "Admin / Owner":
-        users_list = User.query.filter_by(created_by_id=current_user.id).all()
-        return render_template('users.html', users=users_list)
+        users_list = query.order_by(User.id.desc()).all()
+        return render_template("users.html", users=users_list, q=q, f_role=r)
 
-@bp.route('/add_user', methods=['POST'])
+    # Non-developer: only allow Admin/Owner org view (by permission mapping)
+    owner_id = _get_owner_id()
+    if owner_id is None:
+        flash(_("Invalid organization context."), "danger")
+        return redirect(url_for("main.index"))
+
+    query = User.query.filter((User.id == owner_id) | (User.created_by_id == owner_id))
+
+    if q:
+        query = query.filter((User.username.ilike(f"%{q}%")) | (User.email.ilike(f"%{q}%")))
+    if r:
+        query = query.filter(User.role == r)
+
+    users_list = query.order_by(User.id.asc()).all()
+    return render_template("users.html", users=users_list, q=q, f_role=r)
+
+
+@bp.route("/users/add", methods=["POST"])
 @login_required
 def add_user():
-    username = request.form.get('username', '').strip()
-    email = request.form.get('email', '').strip()
-    password = request.form.get('password', '')
-    role = request.form.get('role')
+    if not has_permission(current_user, "users:create"):
+        abort(403)
 
-    # Validate fields
+    username = (request.form.get("username") or "").strip()
+    email = (request.form.get("email") or "").strip()
+    password = request.form.get("password") or ""
+    role = (request.form.get("role") or "").strip()
+
+    if role not in ["Admin / Owner", "Warehouse Manager", "Sales Agent"]:
+        flash(_("Invalid role."), "danger")
+        return redirect(url_for("users.users"))
+
     if not email or not username or not password:
-        flash("Email, username, and password are required.", "danger")
-        return redirect(url_for('users.users'))
+        flash(_("Email, username, and password are required."), "danger")
+        return redirect(url_for("users.users"))
 
-    # Validate password length
     if len(password) < 8:
-        flash("Password must be at least 8 characters long.", "danger")
-        return redirect(url_for('users.users'))
+        flash(_("Password must be at least 8 characters long."), "danger")
+        return redirect(url_for("users.users"))
 
-    # Check if username or email already exists
-    existing_user = User.query.filter(
-        (User.username == username) | (User.email == email)
-    ).first()
+    # Figure out org owner id
+    # - Admin creates users in their org
+    # - Developer creating users without org context is risky -> block
+    if current_user.role == "Developer":
+        flash(_("Developer must create users from an owner context."), "warning")
+        return redirect(url_for("users.users"))
 
-    if existing_user:
-        flash("Username or Email already exists.", "danger")
-        return redirect(url_for('users.users'))
+    owner_id = _get_owner_id()
+    if not owner_id:
+        flash(_("Invalid organization context."), "danger")
+        return redirect(url_for("users.users"))
 
-    # Secure password hashing
-    hashed_pw = generate_password_hash(password, method='pbkdf2:sha256')
+    existing = User.query.filter((User.username == username) | (User.email == email)).first()
+    if existing:
+        flash(_("Username or Email already exists."), "danger")
+        return redirect(url_for("users.users"))
+
+    hashed_pw = generate_password_hash(password, method="pbkdf2:sha256")
 
     new_user = User(
         username=username,
         email=email,
         password=hashed_pw,
         role=role,
-        created_by_id=current_user.id
+        created_by_id=owner_id,
     )
 
     db.session.add(new_user)
     db.session.commit()
 
-    flash("User added successfully!", "success")
-    return redirect(url_for('users.users'))
+    flash(_("User added successfully!"), "success")
+    return redirect(url_for("users.users"))
 
-@bp.route('/delete_user/<int:id>', methods=['POST'])
+
+@bp.route("/users/update_role/<int:id>", methods=["POST"])
+@login_required
+def update_role(id):
+    if not has_permission(current_user, "users:update_role"):
+        abort(403)
+
+    target = User.query.get_or_404(id)
+
+    # Never allow changing a Developer from non-Developer
+    if target.role == "Developer" and current_user.role != "Developer":
+        flash(_("You cannot change a Developer account."), "warning")
+        return redirect(url_for("users.users"))
+
+    # Developer can change roles except other Developers
+    if current_user.role == "Developer":
+        if target.role == "Developer":
+            flash(_("You cannot change another Developer account."), "warning")
+            return redirect(url_for("users.users"))
+
+        new_role = (request.form.get("role") or "").strip()
+        if new_role not in ["Admin / Owner", "Warehouse Manager", "Sales Agent"]:
+            flash(_("Invalid role."), "danger")
+            return redirect(url_for("users.users"))
+
+        target.role = new_role
+        db.session.commit()
+        flash(_("Role updated."), "success")
+        return redirect(url_for("users.users"))
+
+    # Admin/Owner: org only + safety rules
+    owner_id = _get_owner_id()
+    if not owner_id:
+        flash(_("Invalid organization context."), "danger")
+        return redirect(url_for("users.users"))
+
+    if not _is_in_same_org(target, owner_id):
+        flash(_("You can only manage users in your organization."), "danger")
+        return redirect(url_for("users.users"))
+
+    new_role = (request.form.get("role") or "").strip()
+    if new_role not in ["Admin / Owner", "Warehouse Manager", "Sales Agent"]:
+        flash(_("Invalid role."), "danger")
+        return redirect(url_for("users.users"))
+
+    # Don't let admin downgrade themselves
+    if target.id == current_user.id and new_role != "Admin / Owner":
+        flash(_("You cannot change your own role."), "warning")
+        return redirect(url_for("users.users"))
+
+    # Prevent removing last org admin
+    if _is_org_admin(target) and new_role != "Admin / Owner":
+        admins_count = User.query.filter(
+            ((User.id == owner_id) | (User.created_by_id == owner_id)) &
+            (User.role == "Admin / Owner")
+        ).count()
+
+        if admins_count <= 1:
+            flash(_("You cannot remove the last Admin/Owner for this organization."), "warning")
+            return redirect(url_for("users.users"))
+
+    target.role = new_role
+    db.session.commit()
+
+    flash(_("Role updated."), "success")
+    return redirect(url_for("users.users"))
+
+
+@bp.route("/users/delete/<int:id>", methods=["POST"])
 @login_required
 def delete_user(id):
-    user = User.query.get_or_404(id)
+    if not has_permission(current_user, "users:delete"):
+        abort(403)
 
-    # Developer can delete anyone EXCEPT other developers
+    target = User.query.get_or_404(id)
+
+    # Never allow deleting yourself
+    if target.id == current_user.id:
+        flash(_("You cannot delete your own account."), "warning")
+        return redirect(url_for("users.users"))
+
+    # Developer rules
     if current_user.role == "Developer":
-        if user.role == "Developer":
-            flash("Developer accounts cannot delete each other.")
-            return redirect(request.referrer)
-        db.session.delete(user)
+        if target.role == "Developer":
+            flash(_("Developer accounts cannot delete each other."), "warning")
+            return redirect(url_for("users.users"))
+
+        db.session.delete(target)
         db.session.commit()
-        flash(f"User {user.username} deleted.")
-        return redirect(request.referrer)
+        flash(_("User deleted."), "success")
+        return redirect(url_for("users.users"))
 
-    # Admin can delete only users they created
-    if current_user.role == "Admin / Owner":
-        if user.created_by_id != current_user.id:
-            flash("You can only delete users you created.")
-            return redirect(url_for('users.users'))
+    # Admin/Owner rules (org only)
+    owner_id = _get_owner_id()
+    if not owner_id:
+        flash(_("Invalid organization context."), "danger")
+        return redirect(url_for("users.users"))
 
-        if user.id == current_user.id:
-            flash("You cannot delete your own account.")
-            return redirect(url_for('users.users'))
+    if not _is_in_same_org(target, owner_id):
+        flash(_("You can only delete users in your organization."), "danger")
+        return redirect(url_for("users.users"))
 
-        db.session.delete(user)
-        db.session.commit()
-        flash(f"User {user.username} deleted.")
-        return redirect(url_for('users.users'))
+    # Prevent deleting last org admin
+    if _is_org_admin(target):
+        admins_count = User.query.filter(
+            ((User.id == owner_id) | (User.created_by_id == owner_id)) &
+            (User.role == "Admin / Owner")
+        ).count()
 
-    abort(403)
+        if admins_count <= 1:
+            flash(_("You cannot delete the last Admin/Owner for this organization."), "warning")
+            return redirect(url_for("users.users"))
 
-# Developer Dashboard
-@bp.route('/developer')
-@login_required
-def developer_dashboard():
-    if current_user.role != "Developer":
-        abort(403)
-
-    users_list = User.query.all()
-    return render_template('developer_dashboard.html', users=users_list)
-
-@bp.route('/delete_user_dev/<int:id>', methods=['POST'])
-@login_required
-def delete_user_dev(id):
-    if current_user.role != "Developer":
-        abort(403)
-
-    user = User.query.get_or_404(id)
-    if user.id == current_user.id:
-        flash(_("You cannot delete your own account!"))
-        return redirect(url_for('users.developer_dashboard'))
-
-    db.session.delete(user)
+    db.session.delete(target)
     db.session.commit()
-    flash(_('User %(username)s deleted.') % {'username': user.username})
-    return redirect(url_for('users.developer_dashboard'))
-
-# Developer specific routes
-@bp.route('/developer/user/create', methods=['GET', 'POST'])
-@login_required
-def create_user_dev():
-    if request.method == 'POST':
-        flash('User created successfully!', 'success')
-        return redirect(url_for('users.developer_dashboard'))
-    return render_template('create_user_form.html')
-
-@bp.route('/developer/logs')
-@login_required
-def view_logs_dev():
-    logs = ["Log line 1", "Log line 2", "Log line 3"]
-    return render_template('system_logs.html', logs=logs)
-
-@bp.route('/developer/settings')
-@login_required
-def app_settings_dev():
-    settings = {'app_name': 'Inventory Manager', 'debug_mode': False}
-    return render_template('app_settings.html', settings=settings)
+    flash(_("User deleted."), "success")
+    return redirect(url_for("users.users"))
