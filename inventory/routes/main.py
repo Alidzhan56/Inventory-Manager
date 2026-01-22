@@ -11,12 +11,13 @@ bp = Blueprint("main", __name__)
 
 
 def _get_owner_id():
-    # Org scoping used across your app
+    # returns only an int owner_id or None
     if current_user.role == "Developer":
         return None
     if current_user.role == "Admin / Owner":
         return current_user.id
     return current_user.created_by_id
+
 
 
 def _month_start(dt: datetime) -> datetime:
@@ -35,10 +36,12 @@ def _add_months(dt: datetime, months: int) -> datetime:
 # --------------------------
 @bp.route("/")
 def landing():
-    # If already logged in -> go to dashboard
     if current_user.is_authenticated:
+        if (current_user.role or "").strip() == "Developer":
+            return redirect(url_for("users.developer_dashboard"))
         return redirect(url_for("main.index"))
     return render_template("landing.html")
+
 
 
 # --------------------------
@@ -47,11 +50,15 @@ def landing():
 @bp.route("/dashboard")
 @login_required
 def index():
-    owner_id = _get_owner_id()
+  
+    if (current_user.role or "").strip() == "Developer":
+        return redirect(url_for("users.developer_dashboard"))
 
-    # Developer shouldn't see mixed org dashboard by accident.
-    if owner_id is None:
-        return redirect(url_for("users.users"))
+    owner_id = _get_owner_id()
+    if not owner_id:
+        return redirect(url_for("auth.logout"))
+
+
 
     # -------------------- Base counts (org scoped) -------------------- #
     total_products = Product.query.filter_by(owner_id=owner_id).count()

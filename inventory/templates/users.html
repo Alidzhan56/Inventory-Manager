@@ -59,6 +59,9 @@
   .modal .modal-content { border: 0; border-radius: 16px; }
   .modal .modal-header { border-bottom: 1px solid rgba(15,23,42,.08); }
   .modal .modal-footer { border-top: 1px solid rgba(15,23,42,.08); }
+
+  /* password rules */
+  #pwRules .rule-row i { width: 18px; }
 </style>
 
 <div class="wp-fade-in">
@@ -232,7 +235,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Close') }}"></button>
       </div>
 
-      <form method="POST" action="{{ url_for('users.add_user') }}">
+      <form method="POST" action="{{ url_for('users.add_user') }}" id="addUserForm">
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-4">
@@ -245,10 +248,56 @@
               <input type="text" class="form-control" name="username" placeholder="{{ _('Username') }}" required minlength="3">
             </div>
 
+            <!-- Password with live requirements -->
             <div class="col-md-4">
               <label class="form-label">{{ _('Password') }}</label>
-              <input type="password" class="form-control" name="password" placeholder="{{ _('Password') }}" required minlength="8">
-              <div class="form-text">{{ _('Use at least 8 characters.') }}</div>
+
+              <div class="input-group">
+                <input
+                  type="password"
+                  class="form-control"
+                  name="password"
+                  id="newUserPassword"
+                  placeholder="{{ _('Password') }}"
+                  required
+                  autocomplete="new-password"
+                >
+                <button class="btn btn-outline-secondary" type="button" id="toggleNewUserPassword" tabindex="-1"
+                        title="{{ _('Show/Hide') }}">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+
+              <div class="mt-2 small" id="pwRules">
+                <div class="fw-semibold mb-1">{{ _('Password requirements:') }}</div>
+
+                <div class="d-flex align-items-center gap-2 rule-row" data-rule="len">
+                  <i class="bi bi-x-circle text-danger"></i>
+                  <span>{{ _('At least 8 characters') }}</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 rule-row" data-rule="upper">
+                  <i class="bi bi-x-circle text-danger"></i>
+                  <span>{{ _('At least 1 uppercase letter (A-Z)') }}</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 rule-row" data-rule="lower">
+                  <i class="bi bi-x-circle text-danger"></i>
+                  <span>{{ _('At least 1 lowercase letter (a-z)') }}</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 rule-row" data-rule="digit">
+                  <i class="bi bi-x-circle text-danger"></i>
+                  <span>{{ _('At least 1 number (0-9)') }}</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 rule-row" data-rule="symbol">
+                  <i class="bi bi-x-circle text-danger"></i>
+                  <span>{{ _('At least 1 symbol (!@#...)') }}</span>
+                </div>
+              </div>
+
+              <div class="form-text">{{ _('Tip: use a strong password. The checklist updates while typing.') }}</div>
             </div>
 
             <div class="col-md-4">
@@ -267,7 +316,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="createUserSubmit">
             <i class="bi bi-check2-circle me-1"></i>{{ _('Create User') }}
           </button>
         </div>
@@ -344,6 +393,116 @@ document.addEventListener('DOMContentLoaded', function () {
       roleModal.show();
     });
   });
+
+  // ---- Password live validation (Add User modal) ----
+  const pw = document.getElementById("newUserPassword");
+  const rulesBox = document.getElementById("pwRules");
+  const submitBtn = document.getElementById("createUserSubmit");
+  const toggleBtn = document.getElementById("toggleNewUserPassword");
+  const addUserModalEl = document.getElementById("addUserModal");
+  const addUserForm = document.getElementById("addUserForm");
+
+  if (pw && rulesBox) {
+    const rows = {
+      len: rulesBox.querySelector('[data-rule="len"]'),
+      upper: rulesBox.querySelector('[data-rule="upper"]'),
+      lower: rulesBox.querySelector('[data-rule="lower"]'),
+      digit: rulesBox.querySelector('[data-rule="digit"]'),
+      symbol: rulesBox.querySelector('[data-rule="symbol"]'),
+    };
+
+    function setRow(row, ok) {
+      if (!row) return;
+      const icon = row.querySelector("i");
+      if (!icon) return;
+      icon.className = ok ? "bi bi-check-circle text-success" : "bi bi-x-circle text-danger";
+    }
+
+    function validate(value) {
+      return {
+        len: value.length >= 8,
+        upper: /[A-Z]/.test(value),
+        lower: /[a-z]/.test(value),
+        digit: /\d/.test(value),
+        symbol: /[^a-zA-Z0-9]/.test(value),
+      };
+    }
+
+    function updatePasswordUI() {
+      const value = pw.value || "";
+      const r = validate(value);
+
+      setRow(rows.len, r.len);
+      setRow(rows.upper, r.upper);
+      setRow(rows.lower, r.lower);
+      setRow(rows.digit, r.digit);
+      setRow(rows.symbol, r.symbol);
+
+      const allOk = Object.values(r).every(Boolean);
+
+      if (value.length === 0) {
+        pw.classList.remove("is-valid", "is-invalid");
+      } else {
+        pw.classList.toggle("is-valid", allOk);
+        pw.classList.toggle("is-invalid", !allOk);
+      }
+
+      if (submitBtn) submitBtn.disabled = !allOk;
+      return allOk;
+    }
+
+    pw.addEventListener("input", updatePasswordUI);
+
+    // Show / Hide password
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", function () {
+        const isPw = pw.getAttribute("type") === "password";
+        pw.setAttribute("type", isPw ? "text" : "password");
+        const icon = toggleBtn.querySelector("i");
+        if (icon) icon.className = isPw ? "bi bi-eye-slash" : "bi bi-eye";
+      });
+    }
+
+    // Prevent submit if invalid (extra safety)
+    if (addUserForm) {
+      addUserForm.addEventListener("submit", function (e) {
+        const ok = updatePasswordUI();
+        if (!ok) {
+          e.preventDefault();
+          pw.focus();
+        }
+      });
+    }
+
+    // Reset state when modal closes
+    if (addUserModalEl) {
+      addUserModalEl.addEventListener("hidden.bs.modal", function () {
+        if (addUserForm) addUserForm.reset();
+        pw.setAttribute("type", "password");
+        if (toggleBtn) {
+          const icon = toggleBtn.querySelector("i");
+          if (icon) icon.className = "bi bi-eye";
+        }
+        pw.classList.remove("is-valid", "is-invalid");
+        // reset icons to "x"
+        Object.values(rows).forEach(row => {
+          if (!row) return;
+          const icon = row.querySelector("i");
+          if (icon) icon.className = "bi bi-x-circle text-danger";
+        });
+        if (submitBtn) submitBtn.disabled = true;
+      });
+
+      // When modal opens, start with disabled button until valid password
+      addUserModalEl.addEventListener("shown.bs.modal", function () {
+        if (submitBtn) submitBtn.disabled = true;
+        pw.focus();
+      });
+    }
+
+    // initial state
+    if (submitBtn) submitBtn.disabled = true;
+  }
 });
 </script>
 

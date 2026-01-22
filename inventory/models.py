@@ -1,9 +1,13 @@
 from datetime import datetime
 from flask_login import UserMixin
 from inventory.extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 # ====================== USERS ====================== #
 class User(db.Model, UserMixin):
+    __tablename__ = "user"
+
     id = db.Column(db.Integer, primary_key=True)
 
     username = db.Column(db.String(150), nullable=False, unique=True)
@@ -13,10 +17,57 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(50), nullable=False, default="User")
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
-    # Quick "org branding" field (later we can move it to a Company table)
-    company_name = db.Column(db.String(150))
+    # login tracking (summary)
+    login_count = db.Column(db.Integer, default=0, nullable=False)
+    last_login_ip = db.Column(db.String(64), nullable=True)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    last_login_user_agent = db.Column(db.String(255), nullable=True)
 
+    # NEW: password UX/security
+    force_password_change = db.Column(db.Boolean, default=False, nullable=False)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
+
+    # optional branding (you already had it)
+    company_name = db.Column(db.String(150), nullable=True)
+
+    # relationships
+    created_by = db.relationship("User", remote_side=[id], backref="created_users")
     transactions = db.relationship("Transaction", back_populates="user")
+
+    # login history events
+    login_events = db.relationship(
+        "LoginEvent",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="desc(LoginEvent.logged_in_at)",
+    )
+
+    # helpers
+    def set_password(self, raw_password: str) -> None:
+        self.password = generate_password_hash(raw_password, method="pbkdf2:sha256")
+        self.password_changed_at = datetime.utcnow()
+        self.force_password_change = False
+
+    def check_password(self, raw_password: str) -> bool:
+        return check_password_hash(self.password, raw_password)
+
+
+# ====================== LOGIN HISTORY ====================== #
+class LoginEvent(db.Model):
+    __tablename__ = "login_event"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    logged_in_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+
+    # optional extras (can help later)
+    success = db.Column(db.Boolean, default=True, nullable=False)
+
+    user = db.relationship("User", back_populates="login_events")
 
 
 # ====================== WAREHOUSE ====================== #
@@ -28,13 +79,8 @@ class Warehouse(db.Model):
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
-    # Legacy relationship (product.warehouse_id). Keep it for now so old pages don't break.
     products = db.relationship("Product", backref="warehouse")
-
-    # Real inventory lives here (product + warehouse + quantity)
     stocks = db.relationship("Stock", back_populates="warehouse", cascade="all, delete-orphan")
-
-    # Useful later if you need warehouse-based queries fast
     transactions = db.relationship("Transaction", back_populates="warehouse")
 
 
@@ -46,8 +92,6 @@ class Product(db.Model):
     sku = db.Column(db.String(50), nullable=False)
     category = db.Column(db.String(100))
 
-    # Keep this for backward compatibility.
-    # Once the UI is fully switched to Stock, we can stop using Product.quantity.
     quantity = db.Column(db.Integer, default=0)
 
     default_purchase_price = db.Column(db.Float, default=0.0)
@@ -56,14 +100,9 @@ class Product(db.Model):
     image = db.Column(db.String(200))
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-
-    # Legacy: product "belongs" to one warehouse (old design). Keep until full migration.
     warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouse.id"), nullable=True)
 
-    # New design: product can exist in many warehouses via Stock
     stocks = db.relationship("Stock", back_populates="product", cascade="all, delete-orphan")
-
-    # Transaction lines
     items = db.relationship("TransactionItem", back_populates="product")
 
 
@@ -72,7 +111,7 @@ class Partner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(150), nullable=False)
-    type = db.Column(db.String(50))  # customer / supplier / both
+    type = db.Column(db.String(50))  # Customer / Supplier / Both
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
@@ -93,14 +132,8 @@ class Transaction(db.Model):
     warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouse.id"), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
-    # Lines
-    items = db.relationship(
-        "TransactionItem",
-        back_populates="transaction",
-        cascade="all, delete-orphan",
-    )
+    items = db.relationship("TransactionItem", back_populates="transaction", cascade="all, delete-orphan")
 
-    # Relationships for easy template access
     partner = db.relationship("Partner", back_populates="transactions")
     user = db.relationship("User", back_populates="transactions")
     warehouse = db.relationship("Warehouse", back_populates="transactions")
@@ -118,18 +151,16 @@ class TransactionItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
 
-    # Sales only (filled for Sale lines)
     cost_used = db.Column(db.Float, nullable=True)
     profit = db.Column(db.Float, nullable=True)
 
     product = db.relationship("Product", back_populates="items")
     transaction = db.relationship("Transaction", back_populates="items")
 
-    # Optional backref for FIFO lots created from purchase lines
     purchase_lots = db.relationship("PurchaseLot", back_populates="transaction_item")
 
 
-# ====================== STOCK (Product in Warehouse) ====================== #
+# ====================== STOCK ====================== #
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
@@ -138,7 +169,6 @@ class Stock(db.Model):
 
     quantity = db.Column(db.Integer, default=0)
 
-    # One row per product per warehouse. Keeps the DB sane.
     __table_args__ = (
         db.UniqueConstraint("product_id", "warehouse_id", name="uq_stock_product_warehouse"),
     )
@@ -158,8 +188,6 @@ class PurchaseLot(db.Model):
     unit_cost = db.Column(db.Float, nullable=False)
 
     received_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Trace which purchase line created the lot (super helpful for audits/debugging)
     transaction_item_id = db.Column(db.Integer, db.ForeignKey("transaction_item.id"), nullable=True)
 
     product = db.relationship("Product", backref="purchase_lots")
@@ -170,14 +198,12 @@ class PurchaseLot(db.Model):
 class AppConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
-    # who this config belongs to (one config per organization owner)
-    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
 
     company_name = db.Column(db.String(120), default="My Company")
     logo_path = db.Column(db.String(200))
     notifications_enabled = db.Column(db.Boolean, default=True)
 
-    # new settings
     low_stock_threshold = db.Column(db.Integer, default=5)
-    default_language = db.Column(db.String(10), default="en")  # 'bg' or 'en'
+    default_language = db.Column(db.String(10), default="en")
     currency = db.Column(db.String(10), default="EUR")

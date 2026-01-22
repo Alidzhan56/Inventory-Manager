@@ -7,7 +7,7 @@ from inventory.models import User, AppConfig
 from inventory.utils.translations import set_language, _
 
 
-def create_app(config_name='default'):
+def create_app(config_name="default"):
     """Application factory"""
     app = Flask(__name__)
 
@@ -15,7 +15,7 @@ def create_app(config_name='default'):
     app.config.from_object(config[config_name])
 
     # Create upload folder
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     # Initialize extensions
     db.init_app(app)
@@ -34,9 +34,12 @@ def create_app(config_name='default'):
         # default: nothing loaded
         g.app_config = None
 
-        # if user not logged in, we can't know the company
         from flask_login import current_user
         if not current_user.is_authenticated:
+            return
+
+        # Developer should not load org config / regular site context
+        if (current_user.role or "").strip() == "Developer":
             return
 
         # find the organization owner
@@ -53,7 +56,7 @@ def create_app(config_name='default'):
                 notifications_enabled=True,
                 low_stock_threshold=5,
                 default_language="en",
-                currency="BGN",
+                currency="EUR",
             )
             db.session.add(config_obj)
             db.session.commit()
@@ -76,9 +79,26 @@ def create_app(config_name='default'):
     app.register_blueprint(main.bp)
     app.register_blueprint(reports.bp)
 
-
-    # Create database tables
+    # Create database tables + optional dev user
     with app.app_context():
         db.create_all()
+
+        # Optional: auto-create Developer user from env
+        dev_email = os.environ.get("DEV_EMAIL")
+        dev_username = os.environ.get("DEV_USERNAME", "developer")
+        dev_password = os.environ.get("DEV_PASSWORD")
+
+        if dev_email and dev_password:
+            existing = User.query.filter_by(email=dev_email).first()
+            if not existing:
+                from werkzeug.security import generate_password_hash
+                dev_user = User(
+                    username=dev_username,
+                    email=dev_email,
+                    password=generate_password_hash(dev_password, method="pbkdf2:sha256"),
+                    role="Developer",
+                )
+                db.session.add(dev_user)
+                db.session.commit()
 
     return app

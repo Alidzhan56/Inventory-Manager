@@ -1,51 +1,97 @@
 # inventory/utils/permissions.py
 
-# Central Role -> Permission mapping
-ROLE_PERMISSIONS = {
-    "Admin / Owner": {
-        "dashboard:view",
-        "products:view", "products:create", "products:edit", "products:delete",
-        "warehouses:view", "warehouses:create", "warehouses:delete",
-        "partners:view", "partners:create", "partners:edit", "partners:delete",
-        "transactions:view", "transactions:create_purchase", "transactions:create_sale",
-        "users:view", "users:create", "users:update_role", "users:delete",
-        "settings:view", "settings:update",
+from __future__ import annotations
+
+from typing import Iterable
+
+
+# Canonical role names used across the app
+ROLE_DEVELOPER = "Developer"
+ROLE_ADMIN_OWNER = "Admin / Owner"
+ROLE_WAREHOUSE = "Warehouse Manager"
+ROLE_SALES = "Sales Agent"
+
+
+def _norm_role(role: str | None) -> str:
+    """
+    Normalize role strings to avoid mismatches like:
+    'Admin/Owner' vs 'Admin / Owner' vs ' Admin / Owner '
+    """
+    if not role:
+        return ""
+    r = " ".join(role.strip().split())  # normalize whitespace
+    # normalize common variants
+    if r.replace(" ", "") in {"Admin/Owner", "Admin/Owner"}:
+        return ROLE_ADMIN_OWNER
+    if r in {"Admin/Owner"}:
+        return ROLE_ADMIN_OWNER
+    return r
+
+
+# Permissions per role
+ROLE_PERMISSIONS: dict[str, set[str]] = {
+    ROLE_DEVELOPER: {
+        # developer-only things (adjust to your needs)
+        "users:view",
+        "users:delete",
+        # Developer should NOT manage org settings by design
     },
 
-    "Warehouse Manager": {
-        "dashboard:view",
-        "products:view", "products:create", "products:edit",
-        "warehouses:view", "warehouses:create",
-        "partners:view",  # can select partner on transactions
-        "transactions:view", "transactions:create_purchase", "transactions:create_sale",
-    },
+    ROLE_ADMIN_OWNER: {
+        # users
+        "users:view",
+        "users:create",
+        "users:update_role",
+        "users:delete",
 
-    "Sales Agent": {
-        "dashboard:view",
+        # settings
+        "settings:manage",
+
+        # inventory (examples - add your real actions)
         "products:view",
+        "products:create",
+        "products:update",
+        "products:delete",
+
         "warehouses:view",
-        "partners:view",  # IMPORTANT: can SEE partners but not create/edit/delete
-        "transactions:view", "transactions:create_sale",
+        "warehouses:create",
+        "warehouses:update",
+        "warehouses:delete",
+
+        "partners:view",
+        "partners:create",
+        "partners:update",
+        "partners:delete",
+
+        "transactions:view",
+        "transactions:create",
+        "reports:view",
     },
 
-    # Developer: superuser style for maintenance
-    "Developer": {
-        "dashboard:view",
-        "products:view", "products:create", "products:edit", "products:delete",
-        "warehouses:view", "warehouses:create", "warehouses:delete",
-        "partners:view", "partners:create", "partners:edit", "partners:delete",
-        "transactions:view", "transactions:create_purchase", "transactions:create_sale",
-        "users:view", "users:create", "users:update_role", "users:delete",
-        "settings:view", "settings:update",
+    ROLE_WAREHOUSE: {
+        "products:view",
+        "products:create",
+        "products:update",
+
+        "warehouses:view",
+        "warehouses:update",
+
+        "transactions:view",
+        "transactions:create",
+    },
+
+    ROLE_SALES: {
+        "products:view",
+        "transactions:create",
+        "transactions:view",
     },
 }
 
 
 def has_permission(user, permission: str) -> bool:
     """
-    Returns True if user has a permission by role mapping.
-    If role missing/unknown -> False.
+    Check whether a user has a permission string like 'settings:manage'.
     """
-    role = (getattr(user, "role", "") or "").strip()
-    perms = ROLE_PERMISSIONS.get(role, set())
-    return permission in perms
+    role = _norm_role(getattr(user, "role", None))
+    allowed = ROLE_PERMISSIONS.get(role, set())
+    return permission in allowed

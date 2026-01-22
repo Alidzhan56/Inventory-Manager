@@ -164,15 +164,9 @@
     }
 
     @media (max-width: 991px) {
-      .sidebar {
-        transform: translateX(-105%);
-      }
-      .sidebar.open {
-        transform: translateX(0);
-      }
-      .sidebar-overlay.open {
-        display: block;
-      }
+      .sidebar { transform: translateX(-105%); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-overlay.open { display: block; }
     }
 
     /* Desktop content offset */
@@ -207,23 +201,11 @@
       border-top-left-radius: var(--radius) !important;
       border-top-right-radius: var(--radius) !important;
     }
-    .table thead th {
-      font-weight: 700;
-      color: #334155;
-    }
-    .alert {
-      border-radius: 14px;
-      box-shadow: var(--shadow);
-      border: 0;
-    }
+    .table thead th { font-weight: 700; color: #334155; }
+    .alert { border-radius: 14px; box-shadow: var(--shadow); border: 0; }
 
     /* Footer */
-    .footer {
-      color: var(--muted);
-      font-size: 0.85rem;
-      padding: 16px 0 24px;
-    }
-
+    .footer { color: var(--muted); font-size: 0.85rem; padding: 16px 0 24px; }
     h1, h2, h3 { letter-spacing: -0.02em; }
   </style>
 </head>
@@ -234,19 +216,26 @@
 <nav class="navbar navbar-dark topbar fixed-top">
   <div class="container-fluid">
 
-    {% if current_user.is_authenticated %}
+    {% if current_user.is_authenticated and current_user.role != 'Developer' %}
       <button id="sidebarToggle" class="btn btn-sm btn-outline-light d-lg-none me-2" type="button">
         <i class="bi bi-list"></i>
       </button>
     {% endif %}
 
-    <a class="navbar-brand brand" href="{% if current_user.is_authenticated %}{{ url_for('main.index') }}{% else %}{{ url_for('main.landing') }}{% endif %}">
+    <a class="navbar-brand brand"
+       href="{% if current_user.is_authenticated %}
+                {% if current_user.role == 'Developer' %}
+                  {{ url_for('users.developer_dashboard') }}
+                {% else %}
+                  {{ url_for('main.index') }}
+                {% endif %}
+              {% else %}
+                {{ url_for('main.landing') }}
+              {% endif %}">
       <img src="{{ url_for('static', filename='warepulse-logo.png') }}" alt="WarePulse Logo" />
       <div class="d-flex flex-column">
         <span class="name">WarePulse</span>
-        <span class="company">
-          {{ g.app_config.company_name if g.app_config else '' }}
-        </span>
+        <span class="company">{{ g.app_config.company_name if g.app_config else '' }}</span>
       </div>
     </a>
 
@@ -266,11 +255,7 @@
           </a>
 
           <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-              <span class="dropdown-item-text text-muted small">
-                {{ current_user.role }}
-              </span>
-            </li>
+            <li><span class="dropdown-item-text text-muted small">{{ current_user.role }}</span></li>
             <li><hr class="dropdown-divider"></li>
 
             {% if current_user.role == 'Admin / Owner' %}
@@ -280,6 +265,13 @@
                 </a>
               </li>
             {% endif %}
+
+              <a class="dropdown-item d-flex align-items-center gap-2"
+                 href="{{ url_for('settings.change_password') }}">
+                 <i class="bi bi-shield-lock"></i>
+                {{ _('Change Password') }}
+             </a>
+
 
             <li>
               <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
@@ -296,59 +288,58 @@
   </div>
 </nav>
 
-{% if current_user.is_authenticated %}
-<!-- SIDEBAR OVERLAY (mobile) -->
-<div id="sidebarOverlay" class="sidebar-overlay"></div>
+{% if current_user.is_authenticated and current_user.role != 'Developer' %}
+  <!-- SIDEBAR OVERLAY (mobile) -->
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-<!-- SIDEBAR -->
-<aside id="sidebar" class="sidebar">
-  <div class="nav-group-label">{{ _('Menu') }}</div>
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar">
+    <div class="nav-group-label">{{ _('Menu') }}</div>
 
-  <a href="{{ url_for('main.index') }}"
-     class="side-link {% if request.endpoint == 'main.index' %}active{% endif %}">
-    <i class="bi bi-house-door"></i> {{ _('Home') }}
-  </a>
-
-  <a href="{{ url_for('products.products') }}"
-     class="side-link {% if request.endpoint and request.endpoint.startswith('products.') %}active{% endif %}">
-    <i class="bi bi-box-seam"></i> {{ _('Products') }}
-  </a>
-
-  <a href="{{ url_for('warehouses.warehouses') }}"
-     class="side-link {% if request.endpoint and request.endpoint.startswith('warehouses.') %}active{% endif %}">
-    <i class="bi bi-building"></i> {{ _('Warehouses') }}
-  </a>
-
-  <a href="{{ url_for('transactions.transactions') }}"
-     class="side-link {% if request.endpoint and request.endpoint.startswith('transactions.') %}active{% endif %}">
-    <i class="bi bi-arrow-left-right"></i> {{ _('Transactions') }}
-  </a>
-
-  <a href="{{ url_for('partners.partners') }}"
-     class="side-link {% if request.endpoint and request.endpoint.startswith('partners.') %}active{% endif %}">
-    <i class="bi bi-people"></i> {{ _('Partners') }}
-  </a>
-
-  {% if current_user.role == 'Admin / Owner' %}
-    <div class="nav-group-label">{{ _('Admin') }}</div>
-
-    <a href="{{ url_for('users.users') }}"
-       class="side-link {% if request.endpoint and request.endpoint.startswith('users.') %}active{% endif %}">
-      <i class="bi bi-person-gear"></i> {{ _('Users') }}
+    <a href="{{ url_for('main.index') }}"
+       class="side-link {% if request.endpoint == 'main.index' %}active{% endif %}">
+      <i class="bi bi-house-door"></i> {{ _('Home') }}
     </a>
 
-<a href="{{ url_for('reports.reports_home') }}"
-   class="side-link {% if request.endpoint and request.endpoint.startswith('reports.') %}active{% endif %}">
-  <i class="bi bi-file-earmark-bar-graph"></i> {{ _('Reports') }}
-</a>
-
-
-    <a href="{{ url_for('settings.settings') }}"
-       class="side-link {% if request.endpoint and request.endpoint.startswith('settings.') %}active{% endif %}">
-      <i class="bi bi-gear"></i> {{ _('Settings') }}
+    <a href="{{ url_for('products.products') }}"
+       class="side-link {% if request.endpoint and request.endpoint.startswith('products.') %}active{% endif %}">
+      <i class="bi bi-box-seam"></i> {{ _('Products') }}
     </a>
-  {% endif %}
-</aside>
+
+    <a href="{{ url_for('warehouses.warehouses') }}"
+       class="side-link {% if request.endpoint and request.endpoint.startswith('warehouses.') %}active{% endif %}">
+      <i class="bi bi-building"></i> {{ _('Warehouses') }}
+    </a>
+
+    <a href="{{ url_for('transactions.transactions') }}"
+       class="side-link {% if request.endpoint and request.endpoint.startswith('transactions.') %}active{% endif %}">
+      <i class="bi bi-arrow-left-right"></i> {{ _('Transactions') }}
+    </a>
+
+    <a href="{{ url_for('partners.partners') }}"
+       class="side-link {% if request.endpoint and request.endpoint.startswith('partners.') %}active{% endif %}">
+      <i class="bi bi-people"></i> {{ _('Partners') }}
+    </a>
+
+    {% if current_user.role == 'Admin / Owner' %}
+      <div class="nav-group-label">{{ _('Admin') }}</div>
+
+      <a href="{{ url_for('users.users') }}"
+         class="side-link {% if request.endpoint and request.endpoint.startswith('users.') %}active{% endif %}">
+        <i class="bi bi-person-gear"></i> {{ _('Users') }}
+      </a>
+
+      <a href="{{ url_for('reports.reports_home') }}"
+         class="side-link {% if request.endpoint and request.endpoint.startswith('reports.') %}active{% endif %}">
+        <i class="bi bi-file-earmark-bar-graph"></i> {{ _('Reports') }}
+      </a>
+
+      <a href="{{ url_for('settings.settings') }}"
+         class="side-link {% if request.endpoint and request.endpoint.startswith('settings.') %}active{% endif %}">
+        <i class="bi bi-gear"></i> {{ _('Settings') }}
+      </a>
+    {% endif %}
+  </aside>
 {% endif %}
 
 <!-- CONTENT -->
@@ -378,7 +369,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-{% if current_user.is_authenticated %}
+{% if current_user.is_authenticated and current_user.role != 'Developer' %}
 <script>
   const sidebar = document.getElementById("sidebar");
   const overlay = document.getElementById("sidebarOverlay");

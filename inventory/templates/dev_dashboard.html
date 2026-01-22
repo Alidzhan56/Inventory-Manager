@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="{{ g.lang or 'en' }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ _('Developer') }} · WarePulse</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel: rgba(255,255,255,.06);
+      --border: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.68);
+      --accent:#0d6efd;
+      --danger:#dc3545;
+      --radius: 16px;
+      --shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+
+    body{
+      min-height: 100vh;
+      background:
+        radial-gradient(900px 420px at 12% 0%, rgba(13,110,253,.25), transparent 55%),
+        radial-gradient(900px 420px at 88% 0%, rgba(220,53,69,.18), transparent 60%),
+        linear-gradient(180deg, #0b1220, #070b14);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+
+    .topbar{
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(12px);
+      background: rgba(10, 16, 30, .72);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .panel{
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .form-control{
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+    }
+    .form-control::placeholder{ color: rgba(255,255,255,.55); }
+
+    .table{
+      color: var(--text);
+      margin: 0;
+    }
+
+    /* ✅ Table headers visible */
+    .table thead th{
+      color: rgba(255,255,255,.92) !important;
+      background: rgba(255,255,255,.06) !important;
+      border-bottom: 1px solid rgba(255,255,255,.14) !important;
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .table td{
+      border-color: rgba(255,255,255,.10) !important;
+      vertical-align: middle;
+    }
+    .table tbody tr:hover{
+      background: rgba(255,255,255,.04);
+    }
+
+    .btn{ border-radius: 14px; }
+
+    .btn-danger{
+      background: rgba(220,53,69,.95);
+      border: none;
+    }
+    .btn-danger:hover{
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(220,53,69,.22);
+    }
+
+    /* ✅ Make outline-light buttons NOT pale (e.g., Logout, Close) */
+    .btn-outline-light{
+      border-color: rgba(255,255,255,.30) !important;
+      color: rgba(255,255,255,.92) !important;
+      background: rgba(255,255,255,.06);
+    }
+    .btn-outline-light:hover{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.45) !important;
+    }
+
+    /* ✅ Make "History" button visible + consistent */
+    .btn-info{
+      color: #0b1220 !important;
+      font-weight: 700;
+    }
+    button.history-btn:not(:disabled){
+      opacity: 1 !important;
+      filter: none !important;
+    }
+
+    .muted{ color: var(--muted); }
+
+    .modal-content{
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(16, 22, 36, .96);
+      color: var(--text);
+    }
+    .modal-header{ border-bottom: 1px solid rgba(255,255,255,.10); }
+    .modal-footer{ border-top: 1px solid rgba(255,255,255,.10); }
+
+    .btn-close.btn-close-white{ filter: invert(1); }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="container py-3 d-flex align-items-center justify-content-between">
+      <div class="fw-bold">
+        <i class="bi bi-shield-lock-fill me-2 text-primary"></i>
+        WarePulse · {{ _('Developer') }}
+      </div>
+      <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.logout') }}">
+        <i class="bi bi-box-arrow-right me-1"></i>{{ _('Logout') }}
+      </a>
+    </div>
+  </div>
+
+  <div class="container my-4">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} mb-3">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="panel mb-3">
+      <div class="p-3 p-md-4">
+        <form method="GET" class="row g-2 align-items-end">
+          <div class="col-md-10">
+            <label class="form-label muted">{{ _('Search') }}</label>
+            <input class="form-control" name="q" value="{{ q or '' }}" placeholder="{{ _('Search by username or email...') }}">
+          </div>
+          <div class="col-md-2 d-grid">
+            <button class="btn btn-primary">
+              <i class="bi bi-search me-1"></i>{{ _('Apply') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center px-3 px-md-4 py-3"
+           style="border-bottom:1px solid rgba(255,255,255,.10);">
+        <div class="fw-semibold"><i class="bi bi-people me-2"></i>{{ _('All Users') }}</div>
+        <div class="muted small">{{ users|length }} {{ _('total') }}</div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:60px">#</th>
+              <th>{{ _('Username') }}</th>
+              <th>{{ _('Email') }}</th>
+              <th style="width:160px">{{ _('Last IP') }}</th>
+              <th style="width:200px">{{ _('Last Login') }}</th>
+              <th style="width:120px" class="text-center">{{ _('Logins') }}</th>
+              <th style="width:260px" class="text-end">{{ _('Actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td class="muted">{{ loop.index }}</td>
+              <td class="fw-semibold">{{ u.username }}</td>
+              <td class="muted">{{ u.email }}</td>
+
+              <td class="muted">
+                {{ u.last_login_ip or '-' }}
+              </td>
+
+              <td class="muted">
+                {% if u.last_login_at %}
+                  {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td class="text-center fw-semibold">
+                {{ u.login_count or 0 }}
+              </td>
+
+              <td class="text-end">
+                <!-- ✅ History button (NOT pale) -->
+                <button
+                  type="button"
+                  class="btn btn-sm btn-info me-2 history-btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#historyModal"
+                  data-username="{{ u.username }}"
+                  data-email="{{ u.email }}"
+                  data-count="{{ u.login_count or 0 }}"
+                  data-ip="{{ u.last_login_ip or '' }}"
+                  data-at="{% if u.last_login_at %}{{ u.last_login_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}"
+                >
+                  <i class="bi bi-clock-history me-1"></i>{{ _('History') }}
+                </button>
+
+                <button
+                  class="btn btn-sm btn-danger"
+                  data-bs-toggle="modal"
+                  data-bs-target="#deleteUserModal"
+                  data-user-id="{{ u.id }}"
+                  data-username="{{ u.username }}"
+                  {% if u.id == current_user.id or (u.role or '').strip() == 'Developer' %}disabled{% endif %}
+                >
+                  <i class="bi bi-trash me-1"></i>{{ _('Delete') }}
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" class="text-center muted py-4">{{ _('No users found.') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ✅ History Modal (bigger + scrollable) -->
+  <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-clock-history me-2"></i>{{ _('Login Info') }}
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2"><span class="muted">{{ _('User') }}:</span> <strong id="hUser"></strong></div>
+          <div class="mb-2"><span class="muted">{{ _('Email') }}:</span> <span id="hEmail"></span></div>
+          <hr style="border-color: rgba(255,255,255,.12);">
+          <div class="mb-2"><span class="muted">{{ _('Login count') }}:</span> <strong id="hCount"></strong></div>
+          <div class="mb-2"><span class="muted">{{ _('Last login time') }}:</span> <span id="hAt"></span></div>
+          <div class="mb-2"><span class="muted">{{ _('Last login IP') }}:</span> <span id="hIp"></span></div>
+          <div class="mb-0">
+            <span class="muted">{{ _('Location') }}:</span>
+            <span id="hLoc"></span>
+            <div class="muted small mt-1">
+              {{ _('Localhost (127.0.0.1) is normal during testing. Real country appears after hosting or after GeoIP is added.') }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-light" data-bs-dismiss="modal">{{ _('Close') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete modal -->
+  <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true"
+       data-url-pattern="{{ url_for('users.delete_user_dev', id=0) }}">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ _('Confirm Deletion') }}
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {{ _('Are you sure you want to delete the user') }} <strong id="modalUsername"></strong>?
+          <div class="muted small mt-2">{{ _('This action cannot be undone.') }}</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+          <form id="deleteUserForm" method="POST" action="">
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-trash me-1"></i>{{ _('Delete') }}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Delete modal wiring
+      const delModal = document.getElementById('deleteUserModal');
+      if (delModal) {
+        delModal.addEventListener('show.bs.modal', function (event) {
+          const btn = event.relatedTarget;
+          const userId = btn.getAttribute('data-user-id');
+          const username = btn.getAttribute('data-username');
+
+          document.getElementById('modalUsername').textContent = username;
+
+          const form = document.getElementById('deleteUserForm');
+          const pattern = delModal.getAttribute('data-url-pattern');
+          form.action = pattern.replace(/\/0$/, '/' + userId);
+        });
+      }
+
+      // History modal wiring
+      const histModal = document.getElementById('historyModal');
+      if (histModal) {
+        histModal.addEventListener('show.bs.modal', function (event) {
+          const btn = event.relatedTarget;
+
+          const username = btn.getAttribute('data-username') || '-';
+          const email = btn.getAttribute('data-email') || '-';
+          const count = btn.getAttribute('data-count') || '0';
+          const ip = btn.getAttribute('data-ip') || '-';
+          const at = btn.getAttribute('data-at') || '-';
+
+          document.getElementById('hUser').textContent = username;
+          document.getElementById('hEmail').textContent = email;
+          document.getElementById('hCount').textContent = count;
+          document.getElementById('hIp').textContent = ip;
+          document.getElementById('hAt').textContent = at;
+
+          // Simple location label for now
+          let loc = 'Unknown';
+          if (ip === '127.0.0.1' || ip === '::1') loc = 'Localhost';
+          document.getElementById('hLoc').textContent = loc;
+        });
+      }
+    });
+  </script>
+</body>
+</html>

@@ -11,7 +11,7 @@ class Config:
     
     # Language settings
     LANGUAGES = ['bg', 'en']
-    DEFAULT_LANG = 'bg'
+    DEFAULT_LANG = 'en'
 
 class DevelopmentConfig(Config):
     """Development configuration"""

@@ -1,7 +1,11 @@
 # inventory/routes/settings.py
 
+import re
+from datetime import datetime
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from inventory.extensions import db
 from inventory.models import AppConfig
@@ -31,6 +35,7 @@ def _get_or_create_config(owner_id: int) -> AppConfig:
 @bp.route("/", methods=["GET", "POST"])
 @login_required
 def settings():
+    # This page is for org/company settings (admin/owner typically)
     if not has_permission(current_user, "settings:manage"):
         flash(_("Access denied"), "danger")
         return redirect(url_for("main.index"))
@@ -60,9 +65,9 @@ def settings():
             flash(_("Company name is required"), "danger")
             return redirect(url_for("settings.settings"))
 
-        allowed_currencies = { "EUR", "USD"}
+        allowed_currencies = {"BGN", "EUR", "USD"}
         if currency not in allowed_currencies:
-            currency = "EUR"
+            currency = "BGN"
 
         if default_language not in {"bg", "en"}:
             default_language = "en"
@@ -82,3 +87,56 @@ def settings():
         return redirect(url_for("settings.settings"))
 
     return render_template("settings.html", config=config)
+
+
+@bp.route("/password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    # This page is for EVERY user (including Developer)
+    if request.method == "POST":
+        current_pw = request.form.get("current_password") or ""
+        new_pw = request.form.get("new_password") or ""
+        confirm_pw = request.form.get("confirm_password") or ""
+
+        # verify current password
+        if not check_password_hash(current_user.password, current_pw):
+            flash(_("Current password is incorrect."), "danger")
+            return redirect(url_for("settings.change_password"))
+
+        # validate new password (reuse your register rules)
+        if new_pw != confirm_pw:
+            flash(_("New password and confirmation do not match."), "danger")
+            return redirect(url_for("settings.change_password"))
+
+        if len(new_pw) < 8:
+            flash(_("Password must be at least 8 characters."), "danger")
+            return redirect(url_for("settings.change_password"))
+        if not re.search(r"[A-Z]", new_pw):
+            flash(_("Password must include at least one uppercase letter."), "danger")
+            return redirect(url_for("settings.change_password"))
+        if not re.search(r"[a-z]", new_pw):
+            flash(_("Password must include at least one lowercase letter."), "danger")
+            return redirect(url_for("settings.change_password"))
+        if not re.search(r"\d", new_pw):
+            flash(_("Password must include at least one number."), "danger")
+            return redirect(url_for("settings.change_password"))
+        if not re.search(r"[^a-zA-Z0-9]", new_pw):
+            flash(_("Password must include at least one symbol."), "danger")
+            return redirect(url_for("settings.change_password"))
+
+        # update password + clear force flag
+        current_user.password = generate_password_hash(new_pw, method="pbkdf2:sha256")
+        current_user.password_changed_at = datetime.utcnow()
+        current_user.force_password_change = False
+        db.session.commit()
+
+        flash(_("Password changed successfully."), "success")
+
+        # If your settings page is admin-only, redirect safely:
+        # - Admin/Owner can go to /settings
+        # - Others can go to main dashboard
+        if has_permission(current_user, "settings:manage") and current_user.role != "Developer":
+            return redirect(url_for("settings.settings"))
+        return redirect(url_for("main.index"))
+
+    return render_template("change_password.html")
