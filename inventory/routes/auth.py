@@ -39,8 +39,6 @@ def login():
             flash(_("Incorrect password."), "danger")
             return redirect(url_for("auth.login"))
 
-        # Decide first-login BEFORE incrementing
-        is_first_login = (user.login_count or 0) == 0
         is_company_user = user.created_by_id is not None
         is_developer = (user.role or "").strip() == "Developer"
 
@@ -69,13 +67,12 @@ def login():
         except Exception:
             db.session.rollback()
 
-        # ---- First-login warning (ONLY ONCE) ----
-        # Requirement: show only for first login, and only for admin-created company users.
-        if is_first_login and is_company_user and not is_developer:
-            flash(
-                _("⚠️ For security, please change your password in Settings → Change Password."),
-                "warning",
-            )
+        # ---- ENFORCE password change for admin-created users ----
+        # If Admin created the user, they start with force_password_change=True.
+        # They must change password before using the system.
+        if is_company_user and not is_developer and getattr(user, "force_password_change", False):
+            flash(_("⚠️ You must change your password before continuing."), "warning")
+            return redirect(url_for("settings.change_password"))
 
         # Redirect based on role
         if is_developer:
@@ -84,6 +81,7 @@ def login():
         return redirect(url_for("main.index"))
 
     return render_template("login.html")
+
 
 
 @bp.route("/register_admin", methods=["GET", "POST"])

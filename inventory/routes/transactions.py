@@ -15,9 +15,10 @@ bp = Blueprint("transactions", __name__)
 
 def _get_owner_id():
     # org owner logic (Developer is special)
-    if current_user.role == "Developer":
+    role = (current_user.role or "").strip()
+    if role == "Developer":
         return None
-    if current_user.role == "Admin / Owner":
+    if role == "Admin / Owner":
         return current_user.id
     return current_user.created_by_id
 
@@ -49,8 +50,8 @@ def transactions():
     # -------------------- CREATE TRANSACTION -------------------- #
     if request.method == "POST":
         ttype = (request.form.get("type") or "").strip()
-        partner_id = request.form.get("partner_id")
-        warehouse_id = request.form.get("warehouse_id")
+        partner_id = (request.form.get("partner_id") or "").strip()
+        warehouse_id = (request.form.get("warehouse_id") or "").strip()
 
         # Permission rules per transaction type
         if ttype == "Sale":
@@ -88,13 +89,21 @@ def transactions():
             flash(_("Developer must create transactions from an owner context."), "warning")
             return redirect(url_for("transactions.transactions"))
 
+        # IDs must be ints
+        try:
+            warehouse_id_int = int(warehouse_id)
+            partner_id_int = int(partner_id)
+        except Exception:
+            flash(_("Invalid warehouse or partner."), "danger")
+            return redirect(url_for("transactions.transactions"))
+
         # Security: make sure chosen warehouse/partner belong to this owner
-        wh_ok = Warehouse.query.filter_by(id=warehouse_id, owner_id=owner_id).first()
+        wh_ok = Warehouse.query.filter_by(id=warehouse_id_int, owner_id=owner_id).first()
         if not wh_ok:
             flash(_("Invalid warehouse."), "danger")
             return redirect(url_for("transactions.transactions"))
 
-        pr_ok = Partner.query.filter_by(id=partner_id, owner_id=owner_id).first()
+        pr_ok = Partner.query.filter_by(id=partner_id_int, owner_id=owner_id).first()
         if not pr_ok:
             flash(_("Invalid partner."), "danger")
             return redirect(url_for("transactions.transactions"))
@@ -123,8 +132,8 @@ def transactions():
 
         result = TransactionService.create_transaction(
             ttype=ttype,
-            partner_id=partner_id,
-            warehouse_id=warehouse_id,
+            partner_id=partner_id_int,
+            warehouse_id=warehouse_id_int,
             user_id=current_user.id,
             items=items,
         )

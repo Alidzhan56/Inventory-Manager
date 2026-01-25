@@ -1,6 +1,9 @@
 # inventory/transactions/services.py
 
+from __future__ import annotations
+
 from datetime import datetime
+from collections import defaultdict
 
 from inventory.extensions import db
 from inventory.models import Product, Transaction, TransactionItem, PurchaseLot, Stock
@@ -72,6 +75,56 @@ class TransactionService:
 
         return cost_used
 
+    @staticmethod
+    def _precheck_sale_stock(items: list[dict], warehouse_id: int) -> dict | None:
+        """
+        Pre-check sale stock for the entire request (handles duplicate product rows).
+        Returns {"error": "..."} if not enough stock, else None.
+        """
+        requested = defaultdict(int)
+
+        # Build requested qty per product
+        for row in items:
+            try:
+                pid = int(row.get("product_id"))
+                qty = int(row.get("quantity", 0))
+            except Exception:
+                return {"error": "Invalid product or quantity."}
+
+            if qty <= 0:
+                return {"error": "Quantity must be greater than 0."}
+
+            requested[pid] += qty
+
+        if not requested:
+            return {"error": "No items provided."}
+
+        product_ids = list(requested.keys())
+
+        # Load products (for nice names)
+        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        product_name = {p.id: (p.name or f"#{p.id}") for p in products}
+
+        # Load stock rows for this warehouse
+        stock_rows = (
+            Stock.query
+            .filter(Stock.warehouse_id == warehouse_id, Stock.product_id.in_(product_ids))
+            .all()
+        )
+        stock_map = {s.product_id: int(s.quantity or 0) for s in stock_rows}
+
+        shortages = []
+        for pid, req_qty in requested.items():
+            available = stock_map.get(pid, 0)  # if no stock row -> 0
+            if req_qty > available:
+                shortages.append((product_name.get(pid, f"#{pid}"), available, req_qty))
+
+        if shortages:
+            lines = [f"{name}: available {avail}, requested {req}" for (name, avail, req) in shortages]
+            return {"error": "Not enough stock for sale:\n" + "\n".join(lines)}
+
+        return None
+
     # -------------------- create pieces -------------------- #
 
     @staticmethod
@@ -140,6 +193,7 @@ class TransactionService:
 
         stock = TransactionService._get_or_create_stock(product_id=product_id, warehouse_id=txn.warehouse_id)
 
+        # Safety check (kept as a second line of defense)
         if not allow_negative and (stock.quantity or 0) < qty:
             return {"error": f"Not enough stock for {product.name} in this warehouse (available {stock.quantity})."}
 
@@ -175,29 +229,40 @@ class TransactionService:
         """
         items: [{product_id, quantity, unit_price}, ...]
         """
-        txn = TransactionService.create_transaction_header(ttype, partner_id, warehouse_id, user_id, note)
+        try:
+            # PRE-CHECK: block negative stock on sales (whole-sale validation)
+            if ttype == "Sale" and not allow_negative:
+                pre = TransactionService._precheck_sale_stock(items, int(warehouse_id))
+                if pre and pre.get("error"):
+                    db.session.rollback()
+                    return {"error": pre["error"]}
 
-        created_items = []
+            txn = TransactionService.create_transaction_header(ttype, partner_id, warehouse_id, user_id, note)
+            created_items = []
 
-        for row in items:
-            pid = int(row.get("product_id"))
-            qty = int(row.get("quantity", 0))
-            unit_price = float(row.get("unit_price", 0.0))
+            for row in items:
+                pid = int(row.get("product_id"))
+                qty = int(row.get("quantity", 0))
+                unit_price = float(row.get("unit_price", 0.0))
 
-            if qty <= 0:
-                db.session.rollback()
-                return {"error": "Quantity must be greater than 0."}
+                if qty <= 0:
+                    db.session.rollback()
+                    return {"error": "Quantity must be greater than 0."}
 
-            if ttype == "Purchase":
-                res = TransactionService.create_purchase_item(txn, pid, qty, unit_price)
-            else:
-                res = TransactionService.create_sale_item(txn, pid, qty, unit_price, allow_negative=allow_negative)
+                if ttype == "Purchase":
+                    res = TransactionService.create_purchase_item(txn, pid, qty, unit_price)
+                else:
+                    res = TransactionService.create_sale_item(txn, pid, qty, unit_price, allow_negative=allow_negative)
 
-            if res.get("error"):
-                db.session.rollback()
-                return {"error": res["error"]}
+                if res.get("error"):
+                    db.session.rollback()
+                    return {"error": res["error"]}
 
-            created_items.append(res.get("item"))
+                created_items.append(res.get("item"))
 
-        db.session.commit()
-        return {"success": True, "transaction": txn, "items": created_items}
+            db.session.commit()
+            return {"success": True, "transaction": txn, "items": created_items}
+
+        except Exception:
+            db.session.rollback()
+            return {"error": "Failed to create transaction. Please try again."}

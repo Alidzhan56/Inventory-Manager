@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
 
 # Canonical role names used across the app
 ROLE_DEVELOPER = "Developer"
@@ -20,11 +18,12 @@ def _norm_role(role: str | None) -> str:
     if not role:
         return ""
     r = " ".join(role.strip().split())  # normalize whitespace
+
     # normalize common variants
-    if r.replace(" ", "") in {"Admin/Owner", "Admin/Owner"}:
+    compact = r.replace(" ", "")
+    if compact == "Admin/Owner":
         return ROLE_ADMIN_OWNER
-    if r in {"Admin/Owner"}:
-        return ROLE_ADMIN_OWNER
+
     return r
 
 
@@ -34,6 +33,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         # developer-only things (adjust to your needs)
         "users:view",
         "users:delete",
+        "users:update_role",
         # Developer should NOT manage org settings by design
     },
 
@@ -47,7 +47,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         # settings
         "settings:manage",
 
-        # inventory (examples - add your real actions)
+        # inventory
         "products:view",
         "products:create",
         "products:update",
@@ -63,8 +63,13 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "partners:update",
         "partners:delete",
 
+        # transactions
         "transactions:view",
-        "transactions:create",
+        "transactions:create",           # generic
+        "transactions:create_sale",      # SALE (used in transactions.py)
+        "transactions:create_purchase",  # PURCHASE (used in transactions.py)
+
+        # reports
         "reports:view",
     },
 
@@ -78,12 +83,15 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 
         "transactions:view",
         "transactions:create",
+        "transactions:create_purchase",  # warehouse staff usually records purchases
     },
 
     ROLE_SALES: {
         "products:view",
-        "transactions:create",
+
         "transactions:view",
+        "transactions:create",
+        "transactions:create_sale",      # sales agent records sales
     },
 }
 

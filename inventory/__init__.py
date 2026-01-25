@@ -1,5 +1,5 @@
 import os
-from flask import Flask, g
+from flask import Flask, g, request, redirect, url_for, flash
 from config import config
 
 from inventory.extensions import db, login_manager
@@ -26,7 +26,7 @@ def create_app(config_name="default"):
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    # Before request: language + org config
+    # Before request: language + org config + force password change guard
     @app.before_request
     def before_request():
         set_language(app)
@@ -38,12 +38,29 @@ def create_app(config_name="default"):
         if not current_user.is_authenticated:
             return
 
+        role = (current_user.role or "").strip()
+
+        # ---- FORCE PASSWORD CHANGE GUARD ----
+        # Only for company users created by admin and only if flagged
+        if role != "Developer" and current_user.created_by_id is not None and getattr(current_user, "force_password_change", False):
+            endpoint = request.endpoint or ""
+
+            allowed_endpoints = {
+                "settings.change_password",
+                "auth.logout",
+                "static",
+            }
+
+            if endpoint not in allowed_endpoints:
+                flash(_("⚠️ You must change your password to continue."), "warning")
+                return redirect(url_for("settings.change_password"))
+
         # Developer should not load org config / regular site context
-        if (current_user.role or "").strip() == "Developer":
+        if role == "Developer":
             return
 
         # find the organization owner
-        owner_id = current_user.id if current_user.role == "Admin / Owner" else current_user.created_by_id
+        owner_id = current_user.id if role == "Admin / Owner" else current_user.created_by_id
         if not owner_id:
             return
 
@@ -97,6 +114,7 @@ def create_app(config_name="default"):
                     email=dev_email,
                     password=generate_password_hash(dev_password, method="pbkdf2:sha256"),
                     role="Developer",
+                    force_password_change=False,
                 )
                 db.session.add(dev_user)
                 db.session.commit()
