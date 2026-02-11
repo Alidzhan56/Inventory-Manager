@@ -1,5 +1,3 @@
-# inventory/routes/transactions.py
-
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 
@@ -14,7 +12,7 @@ bp = Blueprint("transactions", __name__)
 
 
 def _get_owner_id():
-    # org owner logic (Developer is special)
+    # намирам owner-а на фирмата за да филтрирам всичко само в рамките на организацията
     role = (current_user.role or "").strip()
     if role == "Developer":
         return None
@@ -26,14 +24,13 @@ def _get_owner_id():
 @bp.route("/transactions", methods=["GET", "POST"])
 @login_required
 def transactions():
-    # View permission
     if not has_permission(current_user, "transactions:view"):
         flash(_("You do not have permission to view transactions."), "danger")
         return redirect(url_for("main.index"))
 
     owner_id = _get_owner_id()
 
-    # Dropdown data (owner scoped)
+    # данни за dropdown-ите във формата
     products_q = Product.query.order_by(Product.name.asc())
     partners_q = Partner.query.order_by(Partner.name.asc())
     warehouses_q = Warehouse.query.order_by(Warehouse.name.asc())
@@ -47,13 +44,14 @@ def transactions():
     partners = partners_q.all()
     warehouses = warehouses_q.all()
 
-    # -------------------- CREATE TRANSACTION -------------------- #
+    # ==================== CREATE TRANSACTION ====================
     if request.method == "POST":
         ttype = (request.form.get("type") or "").strip()
         partner_id = (request.form.get("partner_id") or "").strip()
         warehouse_id = (request.form.get("warehouse_id") or "").strip()
+        note = (request.form.get("note") or "").strip() or None
 
-        # Permission rules per transaction type
+        # права според типа транзакция
         if ttype == "Sale":
             if not has_permission(current_user, "transactions:create_sale"):
                 flash(_("You do not have permission to record sales."), "danger")
@@ -70,7 +68,7 @@ def transactions():
         quantities = request.form.getlist("qty[]")
         prices = request.form.getlist("unit_price[]")
 
-        # Build rows, skip empty product rows
+        # правя списък с редовете и прескачам празните
         items = []
         for pid, q, p in zip(product_ids, quantities, prices):
             pid = (pid or "").strip()
@@ -84,12 +82,12 @@ def transactions():
                 flash(e, "danger")
             return redirect(url_for("transactions.transactions"))
 
-        # Developer safety: avoid creating mixed org data accidentally
+        # developer да не записва случайно данни без фирма
         if owner_id is None:
             flash(_("Developer must create transactions from an owner context."), "warning")
             return redirect(url_for("transactions.transactions"))
 
-        # IDs must be ints
+        # пазя се от кофти id-та
         try:
             warehouse_id_int = int(warehouse_id)
             partner_id_int = int(partner_id)
@@ -97,7 +95,7 @@ def transactions():
             flash(_("Invalid warehouse or partner."), "danger")
             return redirect(url_for("transactions.transactions"))
 
-        # Security: make sure chosen warehouse/partner belong to this owner
+        # проверявам warehouse и partner да са на същия owner
         wh_ok = Warehouse.query.filter_by(id=warehouse_id_int, owner_id=owner_id).first()
         if not wh_ok:
             flash(_("Invalid warehouse."), "danger")
@@ -108,7 +106,7 @@ def transactions():
             flash(_("Invalid partner."), "danger")
             return redirect(url_for("transactions.transactions"))
 
-        # Validate products ownership
+        # проверявам всички продукти да са от тази фирма
         requested_ids = []
         for row in items:
             try:
@@ -130,12 +128,16 @@ def transactions():
                 flash(_("Invalid product."), "danger")
                 return redirect(url_for("transactions.transactions"))
 
+        # реалното записване е в service-а за да е чисто и да не дублирам логика
         result = TransactionService.create_transaction(
             ttype=ttype,
             partner_id=partner_id_int,
             warehouse_id=warehouse_id_int,
             user_id=current_user.id,
             items=items,
+            note=note,
+            owner_id=owner_id,
+            allow_negative=False,
         )
 
         if result.get("error"):
@@ -145,7 +147,7 @@ def transactions():
         flash(_("Transaction recorded successfully."), "success")
         return redirect(url_for("transactions.transactions"))
 
-    # -------------------- LIST + FILTERS -------------------- #
+    # ==================== LIST + FILTERS ====================
     q_type = (request.args.get("type") or "").strip()
     q_partner_id = (request.args.get("partner_id") or "").strip()
     q_product_id = (request.args.get("product_id") or "").strip()
@@ -171,7 +173,6 @@ def transactions():
     if q_partner_id.isdigit():
         tx_query = tx_query.filter(Transaction.partner_id == int(q_partner_id))
 
-    # Filter by product: txns that have at least one line with that product
     if q_product_id.isdigit():
         tx_query = (
             tx_query
@@ -194,10 +195,7 @@ def transactions():
 @bp.route("/api/stock")
 @login_required
 def api_stock():
-    """
-    Returns available stock for a product in a warehouse:
-    GET /api/stock?warehouse_id=1&product_id=2
-    """
+    # връща наличност за даден продукт в даден склад за да работи UI в sales формата
     if not has_permission(current_user, "transactions:view"):
         return jsonify({"ok": False, "error": "Forbidden."}), 403
 
@@ -209,11 +207,10 @@ def api_stock():
     if not warehouse_id or not product_id:
         return jsonify({"ok": False, "error": "Missing parameters."}), 400
 
-    # Developer safety: avoid returning mixed org data accidentally
     if owner_id is None:
         return jsonify({"ok": False, "error": "Owner context required."}), 403
 
-    # Make sure warehouse & product belong to this org
+    # пак проверка за owner защото е API endpoint
     wh_ok = Warehouse.query.filter_by(id=warehouse_id, owner_id=owner_id).first()
     if not wh_ok:
         return jsonify({"ok": False, "error": "Invalid warehouse."}), 403

@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <h3>{{ _('Add New User') }}</h3>
 
-    <!-- Flash Messages -->
+    <!-- Flash съобщения -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, msg in messages %}
@@ -19,8 +19,11 @@
         <div class="card-header bg-primary text-white">
             {{ _('User Details') }}
         </div>
+
         <div class="card-body">
+            <!-- Форма за добавяне на потребител -->
             <form method="POST" action="{{ url_for('add_user') }}" class="row g-3" novalidate>
+
                 <!-- Email -->
                 <div class="col-md-4">
                     <input type="email" class="form-control" name="email" placeholder="{{ _('Email') }}" required>
@@ -48,6 +51,7 @@
                     </select>
                 </div>
 
+                <!-- Бутони -->
                 <div class="col-12">
                     <button type="submit" class="btn btn-success">{{ _('Add User') }}</button>
                     <a href="{{ url_for('users') }}" class="btn btn-secondary ms-2">{{ _('Back to Users') }}</a>

@@ -13,15 +13,13 @@ bp = Blueprint("warehouses", __name__)
 
 
 def _get_owner_id():
-    """
-    Everyone works inside an organization:
-    - Admin/Owner owns the org
-    - other roles belong to the owner via created_by_id
-    - Developer is special (can see everything), but we still try to keep things safe
-    """
-    if current_user.role == "Developer":
+    # кой е owner-а на фирмата
+    # Admin Owner е owner
+    # другите са вързани с created_by_id
+    role = (current_user.role or "").strip()
+    if role == "Developer":
         return None
-    if current_user.role == "Admin / Owner":
+    if role == "Admin / Owner":
         return current_user.id
     return current_user.created_by_id
 
@@ -41,7 +39,8 @@ def warehouses():
 
     warehouses_list = q.order_by(Warehouse.name.asc()).all()
 
-    # total units per warehouse (quick summary)
+    # бързо summary за таблицата
+    # общо бройки в склада + колко различни продукта има
     stock_totals_q = (
         db.session.query(Stock.warehouse_id, func.coalesce(func.sum(Stock.quantity), 0))
         .join(Warehouse, Stock.warehouse_id == Warehouse.id)
@@ -51,7 +50,6 @@ def warehouses():
 
     stock_totals = dict(stock_totals_q.group_by(Stock.warehouse_id).all())
 
-    # number of different products per warehouse (count stock rows with qty > 0)
     product_counts_q = (
         db.session.query(Stock.warehouse_id, func.count(Stock.id))
         .join(Warehouse, Stock.warehouse_id == Warehouse.id)
@@ -79,7 +77,7 @@ def add_warehouse():
 
     owner_id = _get_owner_id()
 
-    # Avoid creating "ownerless" warehouses (important for Developer context)
+    # да не правим warehouses без owner
     if owner_id is None:
         flash(_("Developer must create warehouses from an owner context."), "warning")
         return redirect(url_for("warehouses.warehouses"))
@@ -91,7 +89,7 @@ def add_warehouse():
         flash(_("Warehouse name is required."), "danger")
         return redirect(url_for("warehouses.warehouses"))
 
-    # Avoid duplicates inside the same org
+    # да няма 2 склада със същото име в една фирма
     existing = Warehouse.query.filter_by(owner_id=owner_id, name=name).first()
     if existing:
         flash(_("A warehouse with this name already exists."), "warning")
@@ -114,14 +112,14 @@ def delete_warehouse(id):
 
     owner_id = _get_owner_id()
 
-    # Owner scope is important: we never delete warehouses outside the org
+    # това е важно за сигурност да не триеш склад от друга фирма
     q = Warehouse.query.filter(Warehouse.id == id)
     if owner_id is not None:
         q = q.filter(Warehouse.owner_id == owner_id)
 
     w = q.first_or_404()
 
-    # If there is stock, deleting would be a disaster.
+    # ако има наличност не го трия
     has_stock = (
         Stock.query
         .filter(Stock.warehouse_id == w.id)
@@ -133,7 +131,7 @@ def delete_warehouse(id):
         flash(_("Cannot delete a warehouse that has stock. Move or sell the items first."), "warning")
         return redirect(url_for("warehouses.warehouses"))
 
-    # If there are transactions, deleting breaks history and reports.
+    # ако има транзакции пак не го трия за да не чупя историята
     has_txn = Transaction.query.filter_by(warehouse_id=w.id).first() is not None
     if has_txn:
         flash(_("Cannot delete a warehouse that has transactions. Keep it for history."), "warning")

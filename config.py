@@ -1,29 +1,32 @@
 import os
 
 class Config:
-    """Base configuration"""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'supersecretkey'  # change in production
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///inventory.db'
+    """базови настройки за проекта"""
+    SECRET_KEY = os.environ.get("SECRET_KEY") or "supersecretkey"  # в production задължително през env
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "sqlite:///inventory.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # Upload folder
-    UPLOAD_FOLDER = 'inventory/static/uploads'
-    
-    # Language settings
-    LANGUAGES = ['bg', 'en']
-    DEFAULT_LANG = 'en'
+
+    # тук качваш снимки на продукти и тн
+    UPLOAD_FOLDER = "inventory/static/uploads"
+
+    # езиците които поддържаш в UI
+    LANGUAGES = ["bg", "en"]
+    DEFAULT_LANG = "en"
+
 
 class DevelopmentConfig(Config):
-    """Development configuration"""
+    """настройки за локална разработка"""
     DEBUG = True
 
+
 class ProductionConfig(Config):
-    """Production configuration"""
+    """настройки за хостинг"""
     DEBUG = False
 
-# Dictionary to easily access configs
+
+# удобна карта за избор на конфигурация
 config = {
-    'development': DevelopmentConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
+    "development": DevelopmentConfig,
+    "production": ProductionConfig,
+    "default": DevelopmentConfig,
 }

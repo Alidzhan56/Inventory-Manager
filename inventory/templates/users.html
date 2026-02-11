@@ -4,7 +4,7 @@
 {% block content %}
 
 <style>
-  /* small page-specific polish */
+  /* Малко page-specific polish (анимация при зареждане) */
   .wp-fade-in {
     animation: wpFadeIn .45s ease both;
   }
@@ -13,6 +13,7 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  /* Чип за "You" */
   .wp-chip {
     display: inline-flex;
     align-items: center;
@@ -25,9 +26,8 @@
     background: rgba(255,255,255,.75);
   }
 
-  .wp-search {
-    position: relative;
-  }
+  /* Поле за търсене с иконка */
+  .wp-search { position: relative; }
   .wp-search i {
     position: absolute;
     left: 12px;
@@ -35,13 +35,13 @@
     transform: translateY(-50%);
     opacity: .65;
   }
-  .wp-search input {
-    padding-left: 38px;
-  }
+  .wp-search input { padding-left: 38px; }
 
+  /* Таблица */
   .wp-table td, .wp-table th { vertical-align: middle; }
   .wp-actions .btn { border-radius: 12px; }
 
+  /* Бадж за роли */
   .role-badge {
     border-radius: 999px;
     font-weight: 700;
@@ -49,30 +49,32 @@
     padding: .35rem .6rem;
   }
 
+  /* Празно състояние */
   .empty-state {
     border: 1px dashed rgba(15,23,42,.18);
     border-radius: 16px;
     background: rgba(255,255,255,.6);
   }
 
-  /* modal feel */
+  /* Модали */
   .modal .modal-content { border: 0; border-radius: 16px; }
   .modal .modal-header { border-bottom: 1px solid rgba(15,23,42,.08); }
   .modal .modal-footer { border-top: 1px solid rgba(15,23,42,.08); }
 
-  /* password rules */
+  /* Правила за парола */
   #pwRules .rule-row i { width: 18px; }
 </style>
 
 <div class="wp-fade-in">
 
-  <!-- Header -->
+  <!-- Заглавие -->
   <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
     <div>
       <h3 class="fw-bold mb-0">{{ _('Manage Users') }}</h3>
       <div class="text-muted mt-1">{{ _('Create users and control access by role.') }}</div>
     </div>
 
+    {# Само Admin/Owner и Developer могат да добавят потребители #}
     {% if current_user.role in ['Admin / Owner', 'Developer'] %}
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
         <i class="bi bi-person-plus me-1"></i>{{ _('Add User') }}
@@ -80,12 +82,13 @@
     {% endif %}
   </div>
 
-  <!-- Filters -->
+  <!-- Търсене и филтър -->
   <div class="card mb-4">
     <div class="card-header bg-white fw-semibold d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center">
         <i class="bi bi-funnel me-2 text-secondary"></i>{{ _('Search & Filter') }}
       </div>
+      <!-- Reset към чист URL -->
       <a class="btn btn-sm btn-outline-secondary"
          href="{{ url_for('users.users') }}">
         <i class="bi bi-arrow-counterclockwise me-1"></i>{{ _('Reset') }}
@@ -128,7 +131,7 @@
     </div>
   </div>
 
-  <!-- Users Table -->
+  <!-- Таблица с потребители -->
   <div class="card">
     <div class="card-header bg-white fw-semibold d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center">
@@ -156,6 +159,7 @@
               <td class="text-muted">{{ loop.index }}</td>
 
               <td class="fw-semibold">
+                {# Маркирам текущия потребител #}
                 {% if u.id == current_user.id %}
                   <span class="wp-chip me-2"><i class="bi bi-person-check"></i>{{ _('You') }}</span>
                 {% endif %}
@@ -177,9 +181,11 @@
               </td>
 
               <td class="text-end wp-actions">
+                {# Само Admin/Owner и Developer могат да управляват #}
                 {% set can_manage = current_user.role in ['Admin / Owner', 'Developer'] %}
                 {% set is_self = (u.id == current_user.id) %}
 
+                <!-- Смяна на роля (disabled ако няма права или ако е себе си и не е Developer) -->
                 <button
                   class="btn btn-sm btn-outline-warning me-1 edit-role-btn"
                   data-id="{{ u.id }}"
@@ -191,6 +197,7 @@
                   <i class="bi bi-shield-check"></i> {{ _('Role') }}
                 </button>
 
+                <!-- Изтриване (disabled ако няма права или ако е себе си) -->
                 <form action="{{ url_for('users.delete_user', id=u.id) }}" method="POST" class="d-inline delete-form">
                   <button
                     type="submit"
@@ -207,6 +214,7 @@
           </tbody>
         </table>
       {% else %}
+        <!-- Празно състояние -->
         <div class="empty-state p-4 text-center">
           <div class="fs-5 fw-semibold mb-1">{{ _('No users found.') }}</div>
           <div class="text-muted">{{ _('Try changing your search filters, or add a new user.') }}</div>
@@ -223,7 +231,7 @@
 
 </div>
 
-<!-- Add User Modal -->
+<!-- Модал: Добавяне на потребител -->
 {% if current_user.role in ['Admin / Owner', 'Developer'] %}
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -248,7 +256,7 @@
               <input type="text" class="form-control" name="username" placeholder="{{ _('Username') }}" required minlength="3">
             </div>
 
-            <!-- Password with live requirements -->
+            <!-- Парола + live checklist -->
             <div class="col-md-4">
               <label class="form-label">{{ _('Password') }}</label>
 
@@ -326,7 +334,7 @@
 </div>
 {% endif %}
 
-<!-- Role Modal -->
+<!-- Модал: Смяна на роля -->
 <div class="modal fade" id="roleModal" tabindex="-1" aria-labelledby="roleModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content shadow-lg">
@@ -363,7 +371,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // delete confirmation
+  // 1) Потвърждение при изтриване
   document.querySelectorAll('.delete-form').forEach(form => {
     form.addEventListener('submit', function (e) {
       const ok = confirm("{{ _('Are you sure you want to delete this user?') }}");
@@ -371,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // role modal wiring
+  // 2) Модал за смяна на роля (Role)
   const roleModalEl = document.getElementById('roleModal');
   const roleModal = roleModalEl ? new bootstrap.Modal(roleModalEl) : null;
   const roleForm = document.getElementById('roleForm');
@@ -387,14 +395,14 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('role-username').textContent = username;
       document.getElementById('role-select').value = role;
 
-      // requires a route: users.update_role(id)
+      // Изисква route: users.update_role(id)
       roleForm.action = "{{ url_for('users.update_role', id=0) }}".replace("/0", "/" + id);
 
       roleModal.show();
     });
   });
 
-  // ---- Password live validation (Add User modal) ----
+  // 3) Live валидация на парола в Add User модала
   const pw = document.getElementById("newUserPassword");
   const rulesBox = document.getElementById("pwRules");
   const submitBtn = document.getElementById("createUserSubmit");
@@ -440,6 +448,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       const allOk = Object.values(r).every(Boolean);
 
+      // Визуална индикация върху input-а
       if (value.length === 0) {
         pw.classList.remove("is-valid", "is-invalid");
       } else {
@@ -447,13 +456,14 @@ document.addEventListener('DOMContentLoaded', function () {
         pw.classList.toggle("is-invalid", !allOk);
       }
 
+      // Disable/Enable submit според валидността на паролата
       if (submitBtn) submitBtn.disabled = !allOk;
       return allOk;
     }
 
     pw.addEventListener("input", updatePasswordUI);
 
-    // Show / Hide password
+    // Show / Hide парола
     if (toggleBtn) {
       toggleBtn.addEventListener("click", function () {
         const isPw = pw.getAttribute("type") === "password";
@@ -463,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Prevent submit if invalid (extra safety)
+    // Safety: не позволявай submit ако паролата не е валидна
     if (addUserForm) {
       addUserForm.addEventListener("submit", function (e) {
         const ok = updatePasswordUI();
@@ -474,33 +484,39 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
-    // Reset state when modal closes
+    // Reset състояние при затваряне на модала
     if (addUserModalEl) {
       addUserModalEl.addEventListener("hidden.bs.modal", function () {
         if (addUserForm) addUserForm.reset();
+
+        // връщам type=password и иконата
         pw.setAttribute("type", "password");
         if (toggleBtn) {
           const icon = toggleBtn.querySelector("i");
           if (icon) icon.className = "bi bi-eye";
         }
+
+        // махам валид/инвалид класове
         pw.classList.remove("is-valid", "is-invalid");
-        // reset icons to "x"
+
+        // връщам всички правила на "x"
         Object.values(rows).forEach(row => {
           if (!row) return;
           const icon = row.querySelector("i");
           if (icon) icon.className = "bi bi-x-circle text-danger";
         });
+
         if (submitBtn) submitBtn.disabled = true;
       });
 
-      // When modal opens, start with disabled button until valid password
+      // При отваряне: бутон disabled докато не стане валидна паролата
       addUserModalEl.addEventListener("shown.bs.modal", function () {
         if (submitBtn) submitBtn.disabled = true;
         pw.focus();
       });
     }
 
-    // initial state
+    // initial
     if (submitBtn) submitBtn.disabled = true;
   }
 });

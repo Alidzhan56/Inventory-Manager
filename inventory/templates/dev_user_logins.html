@@ -12,7 +12,6 @@
     :root{
       --bg:#0b1220;
       --panel: rgba(255,255,255,.06);
-      --panel2: rgba(255,255,255,.08);
       --border: rgba(255,255,255,.12);
       --text: rgba(255,255,255,.92);
       --muted: rgba(255,255,255,.68);
@@ -55,10 +54,14 @@
       color: var(--text);
       margin: 0;
     }
+
+    /* Заглавия на таблицата да се виждат */
     .table thead th{
-      color: rgba(255,255,255,.78);
-      border-bottom: 1px solid rgba(255,255,255,.12) !important;
+      color: rgba(255,255,255,.92) !important;
+      background: rgba(255,255,255,.06) !important;
+      border-bottom: 1px solid rgba(255,255,255,.14) !important;
       white-space: nowrap;
+      font-weight: 700;
     }
     .table td, .table th{
       border-color: rgba(255,255,255,.10) !important;
@@ -79,8 +82,17 @@
     }
 
     .btn{ border-radius: 14px; }
-    .btn-outline-light{ border-color: rgba(255,255,255,.18); }
+    .btn-outline-light{
+      border-color: rgba(255,255,255,.30) !important;
+      color: rgba(255,255,255,.92) !important;
+      background: rgba(255,255,255,.06);
+    }
+    .btn-outline-light:hover{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.45) !important;
+    }
 
+    /* Скривам дългия user-agent да не разваля таблицата */
     .ua{
       max-width: 520px;
       white-space: nowrap;
@@ -111,6 +123,7 @@
   <div class="container my-4">
 
     <div class="panel mb-3">
+      <!-- Обобщение за потребителя -->
       <div class="p-3 p-md-4 d-flex flex-column flex-md-row justify-content-between gap-3">
         <div>
           <div class="badge-soft mb-2">
@@ -132,9 +145,9 @@
               -
             {% endif %}
           </div>
-          <div class="muted small">
-            {{ _('IP') }}: {{ target.last_login_ip or '-' }}
-          </div>
+
+          <div class="muted small">{{ _('IP') }}: {{ target.last_login_ip or '-' }}</div>
+          <div class="muted small">{{ _('Country') }}: {{ target.last_login_country or '-' }}</div>
         </div>
       </div>
     </div>
@@ -149,12 +162,14 @@
       </div>
 
       <div class="table-responsive">
+        <!-- Таблица с последните логвания -->
         <table class="table table-hover align-middle mb-0">
           <thead>
             <tr>
               <th style="width:70px">#</th>
               <th style="width:190px">{{ _('Time') }}</th>
               <th style="width:160px">{{ _('IP Address') }}</th>
+              <th style="width:170px">{{ _('Country') }}</th>
               <th>{{ _('User Agent') }}</th>
               <th class="text-end" style="width:110px">{{ _('Status') }}</th>
             </tr>
@@ -167,6 +182,7 @@
                   {{ e.logged_in_at.strftime('%Y-%m-%d %H:%M:%S') if e.logged_in_at else '-' }}
                 </td>
                 <td class="muted">{{ e.ip_address or '-' }}</td>
+                <td class="muted">{{ e.country or '-' }}</td>
                 <td class="muted ua" title="{{ e.user_agent or '' }}">{{ e.user_agent or '-' }}</td>
                 <td class="text-end">
                   {% if e.success %}
@@ -178,17 +194,13 @@
               </tr>
             {% else %}
               <tr>
-                <td colspan="5" class="text-center muted py-4">{{ _('No login events recorded yet.') }}</td>
+                <td colspan="6" class="text-center muted py-4">{{ _('No login events recorded yet.') }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
 
-      <div class="p-3 p-md-4 muted small" style="border-top:1px solid rgba(255,255,255,.10);">
-        {{ _('Note: On local development you may see 127.0.0.1. Real client IPs appear when deployed behind a proxy that sets X-Forwarded-For.') }}
-      </div>
-    </div>
 
   </div>
 

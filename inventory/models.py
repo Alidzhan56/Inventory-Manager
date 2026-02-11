@@ -17,24 +17,24 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(50), nullable=False, default="User")
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
-    # login tracking (summary)
+    # бързи данни за последния login
     login_count = db.Column(db.Integer, default=0, nullable=False)
     last_login_ip = db.Column(db.String(64), nullable=True)
+    last_login_country = db.Column(db.String(100), nullable=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
     last_login_user_agent = db.Column(db.String(255), nullable=True)
 
-    # NEW: password UX/security
+    # флаг за user-и създадени от админ които трябва да сменят парола
     force_password_change = db.Column(db.Boolean, default=False, nullable=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
 
-    # optional branding (you already had it)
+    # по желание за брандинг ако решиш да го ползваш
     company_name = db.Column(db.String(150), nullable=True)
 
-    # relationships
+    # връзки към други таблици
     created_by = db.relationship("User", remote_side=[id], backref="created_users")
     transactions = db.relationship("Transaction", back_populates="user")
 
-    # login history events
     login_events = db.relationship(
         "LoginEvent",
         back_populates="user",
@@ -42,8 +42,8 @@ class User(db.Model, UserMixin):
         order_by="desc(LoginEvent.logged_in_at)",
     )
 
-    # helpers
     def set_password(self, raw_password: str) -> None:
+        # 1 място за логиката на парола за да не се дублира по route-ове
         self.password = generate_password_hash(raw_password, method="pbkdf2:sha256")
         self.password_changed_at = datetime.utcnow()
         self.force_password_change = False
@@ -57,14 +57,14 @@ class LoginEvent(db.Model):
     __tablename__ = "login_event"
 
     id = db.Column(db.Integer, primary_key=True)
-
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
     logged_in_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     ip_address = db.Column(db.String(64), nullable=True)
+    country = db.Column(db.String(100), nullable=True)
     user_agent = db.Column(db.String(255), nullable=True)
 
-    # optional extras (can help later)
+    # ако решиш да логваш и неуспешни опити остави го така
     success = db.Column(db.Boolean, default=True, nullable=False)
 
     user = db.relationship("User", back_populates="login_events")
@@ -72,6 +72,8 @@ class LoginEvent(db.Model):
 
 # ====================== WAREHOUSE ====================== #
 class Warehouse(db.Model):
+    __tablename__ = "warehouse"
+
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(100), nullable=False)
@@ -86,12 +88,15 @@ class Warehouse(db.Model):
 
 # ====================== PRODUCT ====================== #
 class Product(db.Model):
+    __tablename__ = "product"
+
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(100), nullable=False)
     sku = db.Column(db.String(50), nullable=False)
     category = db.Column(db.String(100))
 
+    # това е legacy поле вече истината е Stock
     quantity = db.Column(db.Integer, default=0)
 
     default_purchase_price = db.Column(db.Float, default=0.0)
@@ -108,6 +113,8 @@ class Product(db.Model):
 
 # ====================== PARTNER ====================== #
 class Partner(db.Model):
+    __tablename__ = "partner"
+
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(150), nullable=False)
@@ -120,6 +127,8 @@ class Partner(db.Model):
 
 # ====================== TRANSACTIONS ====================== #
 class Transaction(db.Model):
+    __tablename__ = "transaction"
+
     id = db.Column(db.Integer, primary_key=True)
 
     type = db.Column(db.String(20))  # Purchase / Sale
@@ -151,6 +160,7 @@ class TransactionItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
 
+    # при Sale това се пълни от FIFO логиката
     cost_used = db.Column(db.Float, nullable=True)
     profit = db.Column(db.Float, nullable=True)
 
@@ -162,6 +172,8 @@ class TransactionItem(db.Model):
 
 # ====================== STOCK ====================== #
 class Stock(db.Model):
+    __tablename__ = "stock"
+
     id = db.Column(db.Integer, primary_key=True)
 
     product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False)
@@ -169,6 +181,7 @@ class Stock(db.Model):
 
     quantity = db.Column(db.Integer, default=0)
 
+    # 1 ред за продукт + warehouse
     __table_args__ = (
         db.UniqueConstraint("product_id", "warehouse_id", name="uq_stock_product_warehouse"),
     )
@@ -179,6 +192,8 @@ class Stock(db.Model):
 
 # ====================== FIFO PURCHASE LOTS ====================== #
 class PurchaseLot(db.Model):
+    __tablename__ = "purchase_lot"
+
     id = db.Column(db.Integer, primary_key=True)
 
     product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False)
@@ -194,8 +209,61 @@ class PurchaseLot(db.Model):
     transaction_item = db.relationship("TransactionItem", back_populates="purchase_lots")
 
 
+# ====================== INVENTORY LEDGER ====================== #
+class StockMovement(db.Model):
+    __tablename__ = "stock_movement"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    transaction_item_id = db.Column(db.Integer, db.ForeignKey("transaction_item.id"), nullable=True)
+
+    product_id = db.Column(db.Integer, db.ForeignKey("product.id"), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouse.id"), nullable=False)
+
+    direction = db.Column(db.String(10), nullable=False)  # IN / OUT
+    quantity = db.Column(db.Integer, nullable=False)      # винаги позитивно
+    unit_cost = db.Column(db.Float, nullable=True)
+    unit_price = db.Column(db.Float, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    note = db.Column(db.String(255), nullable=True)
+
+    transaction = db.relationship("Transaction", backref="stock_movements")
+    transaction_item = db.relationship("TransactionItem", backref="stock_movements")
+    product = db.relationship("Product", backref="stock_movements")
+    warehouse = db.relationship("Warehouse", backref="stock_movements")
+
+
+# ====================== FIFO LOT ALLOCATIONS ====================== #
+class LotAllocation(db.Model):
+    __tablename__ = "lot_allocation"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    transaction_item_id = db.Column(db.Integer, db.ForeignKey("transaction_item.id"), nullable=False)
+    purchase_lot_id = db.Column(db.Integer, db.ForeignKey("purchase_lot.id"), nullable=False)
+
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_cost = db.Column(db.Float, nullable=False)
+
+    transaction_item = db.relationship("TransactionItem", backref="lot_allocations")
+    purchase_lot = db.relationship("PurchaseLot", backref="lot_allocations")
+
+    # за да не се дублира една и съща връзка item->lot
+    __table_args__ = (
+        db.UniqueConstraint("transaction_item_id", "purchase_lot_id", name="uq_item_lot"),
+    )
+
+
 # ====================== SETTINGS ====================== #
 class AppConfig(db.Model):
+    __tablename__ = "app_config"
+
     id = db.Column(db.Integer, primary_key=True)
 
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)

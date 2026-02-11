@@ -8,30 +8,36 @@ from inventory.utils.translations import set_language, _
 
 
 def create_app(config_name="default"):
-    """Application factory"""
+    """
+    App factory
+    тук сглобявам Flask приложението
+    зареждам config
+    връзвам extensions
+    регистрирам blueprints
+    """
     app = Flask(__name__)
 
-    # Load configuration
+    # зареждам конфигурацията според environment-а
     app.config.from_object(config[config_name])
 
-    # Create upload folder
+    # папка за качени снимки и файлове
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # Initialize extensions
+    # връзвам базата и login manager-а към app
     db.init_app(app)
     login_manager.init_app(app)
 
-    # User loader for Flask-Login
     @login_manager.user_loader
     def load_user(user_id):
+        # flask-login използва това за да зареди текущия user от DB
         return User.query.get(int(user_id))
 
-    # Before request: language + org config + force password change guard
     @app.before_request
     def before_request():
+        # езикът да е готов за всеки request
         set_language(app)
 
-        # default: nothing loaded
+        # по подразбиране няма фирмен config
         g.app_config = None
 
         from flask_login import current_user
@@ -40,8 +46,8 @@ def create_app(config_name="default"):
 
         role = (current_user.role or "").strip()
 
-        # ---- FORCE PASSWORD CHANGE GUARD ----
-        # Only for company users created by admin and only if flagged
+        # ако user е създаден от админ и е маркиран да смени парола
+        # пускам го само към change_password logout и static
         if role != "Developer" and current_user.created_by_id is not None and getattr(current_user, "force_password_change", False):
             endpoint = request.endpoint or ""
 
@@ -55,16 +61,17 @@ def create_app(config_name="default"):
                 flash(_("⚠️ You must change your password to continue."), "warning")
                 return redirect(url_for("settings.change_password"))
 
-        # Developer should not load org config / regular site context
+        # developer не зарежда фирмени настройки
         if role == "Developer":
             return
 
-        # find the organization owner
+        # намирам owner на организацията
         owner_id = current_user.id if role == "Admin / Owner" else current_user.created_by_id
         if not owner_id:
             return
 
-        # load config for that owner, or create it if missing
+        # взимам AppConfig за организацията
+        # ако няма създавам дефолтен
         config_obj = AppConfig.query.filter_by(owner_id=owner_id).first()
         if not config_obj:
             config_obj = AppConfig(
@@ -80,10 +87,10 @@ def create_app(config_name="default"):
 
         g.app_config = config_obj
 
-    # Make translation function available in templates
+    # правя _() достъпно в template-ите
     app.jinja_env.globals.update(_=_)
 
-    # Register blueprints
+    # blueprints
     from inventory.routes import auth, products, warehouses, partners, transactions, users, settings, main, reports
 
     app.register_blueprint(auth.bp)
@@ -96,11 +103,10 @@ def create_app(config_name="default"):
     app.register_blueprint(main.bp)
     app.register_blueprint(reports.bp)
 
-    # Create database tables + optional dev user
+    # създавам таблиците и ако има env променливи правя developer user
     with app.app_context():
         db.create_all()
 
-        # Optional: auto-create Developer user from env
         dev_email = os.environ.get("DEV_EMAIL")
         dev_username = os.environ.get("DEV_USERNAME", "developer")
         dev_password = os.environ.get("DEV_PASSWORD")

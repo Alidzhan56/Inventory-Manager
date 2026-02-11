@@ -4,7 +4,7 @@
 
 {% block content %}
 <style>
-  /* subtle page animation */
+  /* Леко “появяване” на елементите */
   .fade-up {
     opacity: 0;
     transform: translateY(10px);
@@ -67,7 +67,7 @@
 
 <div class="container-fluid">
 
-  <!-- Header row -->
+  <!-- Горен ред: поздрав + бързи бутони -->
   <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4 fade-up">
     <div>
       <h3 class="fw-bold mb-1">{{ _('Welcome') }}, {{ current_user.username }}!</h3>
@@ -78,7 +78,7 @@
 
       <div class="text-muted">{{ _('Here is your dashboard overview.') }}</div>
 
-      {# Optional “insight chips” #}
+      <!-- Малки “етикети” за ориентация -->
       <div class="d-flex gap-2 flex-wrap mt-3">
         <span class="chip"><i class="bi bi-calendar3"></i>{{ _('This month') }}</span>
         <span class="chip"><i class="bi bi-graph-up-arrow"></i>{{ _('Last 12 months') }}</span>
@@ -86,7 +86,6 @@
       </div>
     </div>
 
-    <!-- Quick Actions -->
     <div class="d-flex gap-2 flex-wrap">
       <a href="{{ url_for('transactions.transactions') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle me-1"></i>{{ _('Record Transaction') }}
@@ -100,7 +99,7 @@
     </div>
   </div>
 
-  <!-- KPI cards (existing 4) -->
+  <!-- 4 основни KPI карти -->
   <div class="row g-3 fade-up d2">
     <div class="col-md-3 col-sm-6">
       <div class="card border-0 shadow-sm">
@@ -157,7 +156,7 @@
     </div>
   </div>
 
-  <!-- This month KPIs (money + counts) -->
+  <!-- KPI за текущия месец -->
   <div class="row g-3 mt-1 fade-up d3">
     <div class="col-lg-3 col-md-6">
       <div class="mini-kpi">
@@ -224,7 +223,7 @@
     </div>
   </div>
 
-  <!-- Charts -->
+  <!-- Графики -->
   <div class="row g-3 mt-2 fade-up d4">
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm h-100">
@@ -252,7 +251,6 @@
   </div>
 
   <div class="row g-3 mt-0 fade-up d5">
-    <!-- Products by category -->
     <div class="col-lg-4">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -265,7 +263,6 @@
       </div>
     </div>
 
-    <!-- Top products -->
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -314,7 +311,6 @@
     </div>
   </div>
 
-  <!-- Keep these exactly in the dashboard flow -->
   <div class="row g-3 mt-3">
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm">
@@ -398,26 +394,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // ---------- formatting helpers ----------
+  // --------- Данни от backend (Jinja -> JS) ---------
   const currency = {{ (g.app_config.currency if g.app_config and g.app_config.currency else '')|tojson }};
-  const fmtMoney = (n) => {
-    const num = Number(n || 0);
-    // compact: 1,234.56 / 12,345 / 1.2M etc.
-    try {
-      const abs = Math.abs(num);
-      if (abs >= 1000000) return (num / 1000000).toFixed(2) + "M";
-      if (abs >= 1000) return (num / 1000).toFixed(2) + "K";
-      return num.toFixed(2);
-    } catch (e) {
-      return (num || 0).toFixed(2);
-    }
-  };
-
-  // Upgrade visible money values (optional compact)
-  document.querySelectorAll('[data-money]').forEach(el => {
-    const raw = el.getAttribute('data-money');
-    el.textContent = fmtMoney(raw);
-  });
 
   const months = {{ transaction_months|tojson }};
   const txnCounts = {{ transaction_counts|tojson }};
@@ -428,10 +406,29 @@
   const purchaseAmounts = {{ purchase_amounts|tojson }};
   const profitAmounts = {{ profit_amounts|tojson }};
 
-  // Shared tooltip formatting
+  // --------- Малък helper за “къс” формат (K/M) ---------
+  const fmtMoney = (n) => {
+    const num = Number(n || 0);
+    try {
+      const abs = Math.abs(num);
+      if (abs >= 1000000) return (num / 1000000).toFixed(2) + "M";
+      if (abs >= 1000) return (num / 1000).toFixed(2) + "K";
+      return num.toFixed(2);
+    } catch (e) {
+      return (num || 0).toFixed(2);
+    }
+  };
+
+  // Превръщам всички елементи с data-money в по-компактен текст
+  document.querySelectorAll('[data-money]').forEach(el => {
+    const raw = el.getAttribute('data-money');
+    el.textContent = fmtMoney(raw);
+  });
+
+  // Tooltip форматиране (пълна сума с валута)
   const tooltipMoney = (value) => `${currency ? currency + " " : ""}${Number(value || 0).toFixed(2)}`;
 
-  // 1) Money chart: Sales vs Purchases + Profit
+  // 1) Линия: Sales / Purchases / Profit
   const moneyCtx = document.getElementById('moneyChart').getContext('2d');
   new Chart(moneyCtx, {
     type: 'line',
@@ -459,15 +456,13 @@
         x: { grid: { display: false } },
         y: {
           beginAtZero: true,
-          ticks: {
-            callback: (v) => fmtMoney(v)
-          }
+          ticks: { callback: (v) => fmtMoney(v) }
         }
       }
     }
   });
 
-  // 2) Count chart: stacked purchases + sales
+  // 2) Bar: брой транзакции (stacked)
   const countCtx = document.getElementById('countChart').getContext('2d');
   new Chart(countCtx, {
     type: 'bar',
@@ -484,9 +479,7 @@
       plugins: {
         legend: { position: 'bottom' },
         tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`
-          }
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` }
         }
       },
       scales: {
@@ -496,7 +489,7 @@
     }
   });
 
-  // 3) Products by category
+  // 3) Doughnut: продукти по категории
   const categories = {{ product_categories|tojson }};
   const categoryCounts = {{ product_counts|tojson }};
 
@@ -514,9 +507,7 @@
       plugins: {
         legend: { position: 'bottom' },
         tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.label}: ${ctx.parsed}`
-          }
+          callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed}` }
         }
       }
     }

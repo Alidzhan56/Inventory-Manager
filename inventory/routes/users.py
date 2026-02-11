@@ -1,10 +1,11 @@
 # inventory/routes/users.py
 
 import re
+from datetime import datetime
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from datetime import datetime
 
 from inventory.extensions import db
 from inventory.models import User, LoginEvent
@@ -15,12 +16,9 @@ bp = Blueprint("users", __name__)
 
 
 def _get_owner_id():
-    """
-    Owner scoping logic used in your app:
-    - Admin/Owner owns the org
-    - other roles belong to owner via created_by_id
-    - Developer is special (no owner scope)
-    """
+    # това е основната схема за фирмата
+    # owner е Admin Owner
+    # всички други са вързани към него с created_by_id
     role = (current_user.role or "").strip()
     if role == "Developer":
         return None
@@ -34,15 +32,12 @@ def _is_org_admin(user: User) -> bool:
 
 
 def _is_in_same_org(target: User, owner_id: int) -> bool:
-    # Org members are: owner (id == owner_id) + any user created_by_id == owner_id
+    # проверка дали user-а е в същата фирма
     return (target.id == owner_id) or (target.created_by_id == owner_id)
 
 
 def _validate_password_rules(password: str) -> str | None:
-    """
-    Returns an error message if invalid, otherwise None.
-    Same rules as your register_admin.
-    """
+    # валидирам паролата със същите правила като register_admin
     if len(password) < 8:
         return _("Password must be at least 8 characters.")
     if not re.search(r"[A-Z]", password):
@@ -66,7 +61,7 @@ def users():
     q = (request.args.get("q") or "").strip()
     r = (request.args.get("role") or "").strip()
 
-    # Developer sees everything
+    # developer вижда всички
     if (current_user.role or "").strip() == "Developer":
         query = User.query
         if q:
@@ -77,7 +72,7 @@ def users():
         users_list = query.order_by(User.id.desc()).all()
         return render_template("users.html", users=users_list, q=q, f_role=r)
 
-    # Non-developer: only allow Admin/Owner org view (by permission mapping)
+    # нормален режим само хората от фирмата
     owner_id = _get_owner_id()
     if owner_id is None:
         flash(_("Invalid organization context."), "danger")
@@ -105,9 +100,8 @@ def add_user():
     password = request.form.get("password") or ""
     role = (request.form.get("role") or "").strip()
 
+    # тук нарочно държим само не-admin роли
     allowed_roles = ["Warehouse Manager", "Sales Agent"]
-    # NOTE: recommended: only allow creating non-admin roles here.
-    # Admin / Owner should be only through register_admin (org owner).
     if role not in allowed_roles:
         flash(_("Invalid role."), "danger")
         return redirect(url_for("users.users"))
@@ -116,13 +110,12 @@ def add_user():
         flash(_("Email, username, and password are required."), "danger")
         return redirect(url_for("users.users"))
 
-    # Password rules (same as register_admin)
     err = _validate_password_rules(password)
     if err:
         flash(err, "danger")
         return redirect(url_for("users.users"))
 
-    # Developer creating users without org context is risky -> block (your original rule)
+    # developer без owner контекст не прави users
     if (current_user.role or "").strip() == "Developer":
         flash(_("Developer must create users from an owner context."), "warning")
         return redirect(url_for("users.users"))
@@ -146,7 +139,7 @@ def add_user():
         role=role,
         created_by_id=owner_id,
 
-        # NEW: mark as "must change password" after first login
+        # след first login го пращаш да си смени паролата
         force_password_change=True,
         password_changed_at=None,
     )
@@ -166,12 +159,12 @@ def update_role(id):
 
     target = User.query.get_or_404(id)
 
-    # Never allow changing a Developer from non-Developer
+    # пазим developer акаунтите
     if (target.role or "").strip() == "Developer" and (current_user.role or "").strip() != "Developer":
         flash(_("You cannot change a Developer account."), "warning")
         return redirect(url_for("users.users"))
 
-    # Developer can change roles except other Developers
+    # developer може да сменя роли но не на друг developer
     if (current_user.role or "").strip() == "Developer":
         if (target.role or "").strip() == "Developer":
             flash(_("You cannot change another Developer account."), "warning")
@@ -187,7 +180,7 @@ def update_role(id):
         flash(_("Role updated."), "success")
         return redirect(url_for("users.users"))
 
-    # Admin/Owner: org only + safety rules
+    # admin owner може само в неговата фирма
     owner_id = _get_owner_id()
     if not owner_id:
         flash(_("Invalid organization context."), "danger")
@@ -202,12 +195,12 @@ def update_role(id):
         flash(_("Invalid role."), "danger")
         return redirect(url_for("users.users"))
 
-    # Don't let admin downgrade themselves
+    # да не си смениш сам ролята и да се заключиш
     if target.id == current_user.id and new_role != "Admin / Owner":
         flash(_("You cannot change your own role."), "warning")
         return redirect(url_for("users.users"))
 
-    # Prevent removing last org admin
+    # да не махнеш последния admin на фирмата
     if _is_org_admin(target) and new_role != "Admin / Owner":
         admins_count = User.query.filter(
             ((User.id == owner_id) | (User.created_by_id == owner_id)) &
@@ -270,7 +263,7 @@ def dev_user_logins(user_id):
 
     user = User.query.get_or_404(user_id)
 
-    # show latest 50 login events
+    # показвам последните 50 логина за debug и сигурност
     events = (
         LoginEvent.query
         .filter_by(user_id=user.id)
@@ -290,12 +283,12 @@ def delete_user(id):
 
     target = User.query.get_or_404(id)
 
-    # Never allow deleting yourself
+    # не можеш да триеш себе си
     if target.id == current_user.id:
         flash(_("You cannot delete your own account."), "warning")
         return redirect(url_for("users.users"))
 
-    # Developer rules
+    # developer може да трие но не и други developer-и
     if (current_user.role or "").strip() == "Developer":
         if (target.role or "").strip() == "Developer":
             flash(_("Developer accounts cannot delete each other."), "warning")
@@ -306,7 +299,7 @@ def delete_user(id):
         flash(_("User deleted."), "success")
         return redirect(url_for("users.users"))
 
-    # Admin/Owner rules (org only)
+    # admin owner трие само в неговата фирма
     owner_id = _get_owner_id()
     if not owner_id:
         flash(_("Invalid organization context."), "danger")
@@ -316,7 +309,7 @@ def delete_user(id):
         flash(_("You can only delete users in your organization."), "danger")
         return redirect(url_for("users.users"))
 
-    # Prevent deleting last org admin
+    # пак пазим да не изчезне последния admin
     if _is_org_admin(target):
         admins_count = User.query.filter(
             ((User.id == owner_id) | (User.created_by_id == owner_id)) &

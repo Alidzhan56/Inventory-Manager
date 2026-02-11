@@ -1,10 +1,10 @@
 # inventory/routes/reports.py
+
 from datetime import datetime
 from io import BytesIO
 
 from flask import Blueprint, render_template, request, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
-from sqlalchemy import func
 
 from inventory.extensions import db
 from inventory.models import Transaction, TransactionItem, Warehouse, Partner, Product, Stock
@@ -21,6 +21,7 @@ bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 
 def _get_owner_id():
+    # намирам към коя фирма е user-а
     if current_user.role == "Developer":
         return None
     if current_user.role == "Admin / Owner":
@@ -29,6 +30,7 @@ def _get_owner_id():
 
 
 def _require_owner_context(owner_id):
+    # тук пазя да не се правят отчети без owner scope
     if owner_id is None:
         flash(_("Owner context required."), "warning")
         return False
@@ -41,7 +43,6 @@ def _require_owner_context(owner_id):
 def reports_home():
     owner_id = _get_owner_id()
 
-    # dropdowns for filters
     partners = Partner.query.order_by(Partner.name.asc())
     warehouses = Warehouse.query.order_by(Warehouse.name.asc())
 
@@ -66,6 +67,7 @@ def _parse_date(value: str):
 
 
 def _transactions_query(owner_id):
+    # общата база query за транзакции плюс eager loading да не прави 100 заявки
     q = (
         Transaction.query
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -102,10 +104,9 @@ def _apply_tx_filters(q):
         q = q.filter(Transaction.date >= date_from)
 
     if date_to:
-        # include whole day
         q = q.filter(Transaction.date < (date_to.replace(hour=23, minute=59, second=59)))
 
-    # Sales Agent safety rule: allow only Sales exports (if you want)
+    # ако sales agent трябва да вижда само продажби в отчетите
     if current_user.role == "Sales Agent":
         q = q.filter(Transaction.type == "Sale")
 
@@ -145,7 +146,6 @@ def transactions_xlsx():
             float(total),
         ])
 
-    # Autosize-ish
     for col in ws.columns:
         max_len = 0
         col_letter = col[0].column_letter
@@ -234,7 +234,7 @@ def transactions_pdf():
         return redirect(url_for("reports.reports_home"))
 
     q = _apply_tx_filters(_transactions_query(owner_id))
-    txns = q.limit(200).all()  # keep PDF readable
+    txns = q.limit(200).all()  # пазя да не стане 50 страници
 
     bio = BytesIO()
     c = canvas.Canvas(bio, pagesize=A4)

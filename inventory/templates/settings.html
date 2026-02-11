@@ -17,11 +17,13 @@
     <div class="card-body">
       <div class="row g-3">
 
+        <!-- Основни данни за фирмата -->
         <div class="col-md-6">
           <label class="form-label">{{ _('Company Name') }}</label>
           <input type="text" name="company_name" class="form-control" value="{{ config.company_name }}" required>
         </div>
 
+        <!-- Избор на валута за цени/отчети -->
         <div class="col-md-3">
           <label class="form-label">{{ _('Currency') }}</label>
           <select name="currency" class="form-select">
@@ -30,6 +32,7 @@
           </select>
         </div>
 
+        <!-- Език по подразбиране -->
         <div class="col-md-3">
           <label class="form-label">{{ _('Default Language') }}</label>
           <select name="default_language" class="form-select">
@@ -38,6 +41,7 @@
           </select>
         </div>
 
+        <!-- Праг за “Low Stock” -->
         <div class="col-md-4">
           <label class="form-label">{{ _('Low Stock Threshold') }}</label>
           <input type="number" min="0" name="low_stock_threshold" class="form-control"
@@ -47,6 +51,7 @@
           </div>
         </div>
 
+        <!-- Включване/изключване на известия -->
         <div class="col-md-4">
           <label class="form-label">{{ _('Notifications') }}</label>
           <div class="form-check form-switch mt-2">

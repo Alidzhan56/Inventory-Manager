@@ -13,12 +13,11 @@ bp = Blueprint("partners", __name__)
 
 
 def _get_owner_id():
-    """
-    Org logic:
-    - Admin/Owner owns the org
-    - Everyone else points to the owner via created_by_id
-    - Developer is special (no owner filter), but we still avoid letting it create mixed data by accident
-    """
+    # тук решавам към коя фирма (owner) е вързан user-а
+    # admin owner е самия owner
+    # другите са вързани към owner през created_by_id
+    # developer е специален случай и не го филтрирам по owner
+    # но пак внимавам да не създава данни без owner по грешка
     if current_user.role == "Developer":
         return None
     if current_user.role == "Admin / Owner":
@@ -32,14 +31,15 @@ def _get_owner_id():
 def partners():
     owner_id = _get_owner_id()
 
-    # -------------------- CREATE PARTNER -------------------- #
+    # -------------------- СЪЗДАВАНЕ НА ПАРТНЬОР -------------------- #
     if request.method == "POST":
-        # Sales Agents shouldn't create master data. Keep it simple and controlled.
+        # sales agent не трябва да пипа master data
         if current_user.role == "Sales Agent":
             flash(_("Sales Agents cannot create partners."), "danger")
             return redirect(url_for("partners.partners"))
 
-        # In this system partners belong to an owner/org, so avoid creating "ownerless" partners.
+        # ако owner_id е None значи developer е влязъл без owner контекст
+        # и не искам да правя партньори без owner
         if owner_id is None:
             flash(_("Developer must create partners from an owner context."), "warning")
             return redirect(url_for("partners.partners"))
@@ -47,15 +47,18 @@ def partners():
         name = (request.form.get("name") or "").strip()
         ptype = (request.form.get("type") or "").strip()
 
+        # базова валидация
         if not name or not ptype:
             flash(_("Please provide partner name and type."), "danger")
             return redirect(url_for("partners.partners"))
 
+        # позволявам само тези типове
         if ptype not in ["Customer", "Supplier", "Both"]:
             flash(_("Invalid partner type."), "danger")
             return redirect(url_for("partners.partners"))
 
-        # avoid duplicates inside the same org (same name + same type)
+        # пазя от дубликати в рамките на фирмата
+        # тук гледам име (case-insensitive) + тип
         exists = Partner.query.filter(
             Partner.owner_id == owner_id,
             func.lower(Partner.name) == name.lower(),
@@ -73,17 +76,21 @@ def partners():
         flash(_('%(ptype)s "%(name)s" added.') % {"ptype": ptype, "name": name}, "success")
         return redirect(url_for("partners.partners"))
 
-    # -------------------- LIST + FILTERS -------------------- #
+    # -------------------- СПИСЪК + ФИЛТРИ -------------------- #
     q = (request.args.get("q") or "").strip()
     f_type = (request.args.get("type") or "").strip()
 
     query = Partner.query
+
+    # ако не е developer филтрирам по фирма
     if owner_id is not None:
         query = query.filter(Partner.owner_id == owner_id)
 
+    # търсене по име
     if q:
         query = query.filter(Partner.name.ilike(f"%{q}%"))
 
+    # филтър по тип
     if f_type in ["Customer", "Supplier", "Both"]:
         query = query.filter(Partner.type == f_type)
 
@@ -103,7 +110,8 @@ def partners():
 def edit_partner(id):
     owner_id = _get_owner_id()
 
-    # Warehouse Manager can edit partners if you want; if not, remove it from roles_required above.
+    # намирам партньора и пак пазя org scoping
+    # warehouse manager може да редактира ако така си решил с roles_required
     q = Partner.query.filter(Partner.id == id)
     if owner_id is not None:
         q = q.filter(Partner.owner_id == owner_id)
@@ -113,15 +121,18 @@ def edit_partner(id):
     name = (request.form.get("name") or "").strip()
     ptype = (request.form.get("type") or "").strip()
 
+    # име е задължително
     if not name:
         flash(_("Name is required."), "danger")
         return redirect(url_for("partners.partners"))
 
+    # пазя да не вкараш странен тип
     if ptype not in ["Customer", "Supplier", "Both"]:
         flash(_("Invalid partner type."), "danger")
         return redirect(url_for("partners.partners"))
 
-    # block duplicates after editing (same org, name, type, different id)
+    # след edit пак пазя от дубликати
+    # тук добавям Partner.id != partner.id за да не се засечеш сам
     if owner_id is not None:
         dup = Partner.query.filter(
             Partner.owner_id == owner_id,
@@ -147,13 +158,15 @@ def edit_partner(id):
 def delete_partner(id):
     owner_id = _get_owner_id()
 
+    # намирам партньора и пак пазя org scoping
     q = Partner.query.filter(Partner.id == id)
     if owner_id is not None:
         q = q.filter(Partner.owner_id == owner_id)
 
     partner = q.first_or_404()
 
-    # If partner is used in any transaction, don't delete (history matters)
+    # ако има транзакции с този партньор не го трия
+    # историята е важна
     used = Transaction.query.filter_by(partner_id=partner.id).first() is not None
     if used:
         flash(_("Cannot delete a partner that is used in transactions."), "warning")

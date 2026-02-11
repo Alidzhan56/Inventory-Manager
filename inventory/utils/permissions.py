@@ -1,9 +1,7 @@
-# inventory/utils/permissions.py
-
 from __future__ import annotations
 
 
-# Canonical role names used across the app
+# стандартни имена на ролите които ползвам навсякъде в проекта
 ROLE_DEVELOPER = "Developer"
 ROLE_ADMIN_OWNER = "Admin / Owner"
 ROLE_WAREHOUSE = "Warehouse Manager"
@@ -12,14 +10,16 @@ ROLE_SALES = "Sales Agent"
 
 def _norm_role(role: str | None) -> str:
     """
-    Normalize role strings to avoid mismatches like:
-    'Admin/Owner' vs 'Admin / Owner' vs ' Admin / Owner '
+    Нормализирам ролята за да няма проблеми
+    примерно Admin/Owner vs Admin / Owner vs с излишни интервали
     """
     if not role:
         return ""
-    r = " ".join(role.strip().split())  # normalize whitespace
 
-    # normalize common variants
+    # махам излишни интервали
+    r = " ".join(role.strip().split())
+
+    # ако някъде е записано без интервал между / го оправям
     compact = r.replace(" ", "")
     if compact == "Admin/Owner":
         return ROLE_ADMIN_OWNER
@@ -27,14 +27,15 @@ def _norm_role(role: str | None) -> str:
     return r
 
 
-# Permissions per role
+# тук описвам кой какви права има
+# форматът е "module:action"
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     ROLE_DEVELOPER: {
-        # developer-only things (adjust to your needs)
+        # developer има достъп основно до user management
         "users:view",
         "users:delete",
         "users:update_role",
-        # Developer should NOT manage org settings by design
+        # нарочно няма settings:manage
     },
 
     ROLE_ADMIN_OWNER: {
@@ -47,17 +48,19 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         # settings
         "settings:manage",
 
-        # inventory
+        # products
         "products:view",
         "products:create",
         "products:update",
         "products:delete",
 
+        # warehouses
         "warehouses:view",
         "warehouses:create",
         "warehouses:update",
         "warehouses:delete",
 
+        # partners
         "partners:view",
         "partners:create",
         "partners:update",
@@ -65,15 +68,16 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 
         # transactions
         "transactions:view",
-        "transactions:create",           # generic
-        "transactions:create_sale",      # SALE (used in transactions.py)
-        "transactions:create_purchase",  # PURCHASE (used in transactions.py)
+        "transactions:create",
+        "transactions:create_sale",
+        "transactions:create_purchase",
 
         # reports
         "reports:view",
     },
 
     ROLE_WAREHOUSE: {
+        # складов служител
         "products:view",
         "products:create",
         "products:update",
@@ -83,22 +87,24 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 
         "transactions:view",
         "transactions:create",
-        "transactions:create_purchase",  # warehouse staff usually records purchases
+        "transactions:create_purchase",
     },
 
     ROLE_SALES: {
+        # търговец
         "products:view",
 
         "transactions:view",
         "transactions:create",
-        "transactions:create_sale",      # sales agent records sales
+        "transactions:create_sale",
     },
 }
 
 
 def has_permission(user, permission: str) -> bool:
     """
-    Check whether a user has a permission string like 'settings:manage'.
+    Проверявам дали даден user има конкретно право
+    например settings:manage или products:create
     """
     role = _norm_role(getattr(user, "role", None))
     allowed = ROLE_PERMISSIONS.get(role, set())

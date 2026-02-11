@@ -11,7 +11,7 @@
   </div>
 </div>
 
-<!-- RECORD TRANSACTION -->
+<!-- Запис на нова транзакция -->
 <div class="card mb-4">
   <div class="card-header bg-white fw-semibold d-flex align-items-center">
     <i class="bi bi-plus-circle me-2 text-primary"></i>{{ _('Record Transaction') }}
@@ -24,10 +24,11 @@
         <div class="col-md-3">
           <label class="form-label">{{ _('Type') }}</label>
 
+          <!-- Тип транзакция (Purchase / Sale) -->
           <select id="txnType" name="type" class="form-select" required>
             <option value="">{{ _('Select type') }}</option>
 
-            {# Sales Agent: Sale only (UI rule matches backend rule) #}
+            {# Ограничение по роля: Sales Agent вижда само Sale #}
             {% if current_user.role == 'Sales Agent' %}
               <option value="Sale">{{ _('Sale') }}</option>
             {% else %}
@@ -43,6 +44,7 @@
           {% endif %}
         </div>
 
+        <!-- Партньор (клиент/доставчик) -->
         <div class="col-md-4">
           <label class="form-label">{{ _('Partner') }}</label>
           <select name="partner_id" class="form-select" required>
@@ -53,6 +55,7 @@
           </select>
         </div>
 
+        <!-- Склад за транзакцията -->
         <div class="col-md-5">
           <label class="form-label">{{ _('Warehouse') }}</label>
           <select id="warehouseSelect" name="warehouse_id" class="form-select" required>
@@ -64,7 +67,21 @@
         </div>
       </div>
 
-      <!-- Lines -->
+      {# Бележка към транзакцията (по желание) #}
+      <div class="row g-3 mb-3">
+        <div class="col-12">
+          <label class="form-label">{{ _('Note') }}</label>
+          <input
+            type="text"
+            name="note"
+            class="form-control"
+            maxlength="500"
+            placeholder="{{ _('Optional note for this transaction…') }}"
+          >
+        </div>
+      </div>
+
+      <!-- Редове с артикули -->
       <div class="border rounded-3 p-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <div class="fw-semibold">
@@ -84,10 +101,12 @@
         </div>
 
         <div id="rowsContainer">
-          <!-- one default row -->
+          <!-- Първи ред по подразбиране -->
           <div class="row g-2 align-items-end txn-row mb-2">
             <div class="col-md-5">
               <label class="form-label d-md-none">{{ _('Product') }}</label>
+
+              <!-- Продукт + цени в data- атрибути (за авто-попълване) -->
               <select name="product_id[]" class="form-select product-select" required>
                 <option value="">{{ _('Select product') }}</option>
                 {% for p in products %}
@@ -101,6 +120,7 @@
                   </option>
                 {% endfor %}
               </select>
+
               <div class="form-text d-none d-md-block">
                 {{ _('Tip: unit price auto-fills based on type. You can still edit it.') }}
               </div>
@@ -108,6 +128,8 @@
 
             <div class="col-md-2">
               <label class="form-label d-md-none">{{ _('Quantity') }}</label>
+
+              <!-- Количество (при Sale проверявам дали има наличност) -->
               <input type="number" name="qty[]" min="1" class="form-control qty-input" required>
               <div class="invalid-feedback">
                 {{ _('Quantity is higher than available stock in this warehouse.') }}
@@ -131,6 +153,7 @@
             </div>
 
             <div class="col-12">
+              <!-- Показвам наличност само при Sale -->
               <div class="small text-muted stock-hint d-none">
                 <i class="bi bi-info-circle me-1"></i>
                 <span class="stock-text"></span>
@@ -141,6 +164,7 @@
 
         <hr class="my-3">
 
+        <!-- Обща сума -->
         <div class="d-flex justify-content-end">
           <div class="text-end">
             <div class="text-muted small">{{ _('Grand Total') }}</div>
@@ -162,7 +186,7 @@
   </div>
 </div>
 
-<!-- FILTERS -->
+<!-- Филтри за историята -->
 <div class="card mb-4">
   <div class="card-header bg-white fw-semibold d-flex align-items-center">
     <i class="bi bi-funnel me-2 text-secondary"></i>{{ _('Filter Transactions') }}
@@ -212,7 +236,7 @@
   </div>
 </div>
 
-<!-- HISTORY -->
+<!-- История на транзакциите -->
 <div class="card">
   <div class="card-header bg-white fw-semibold d-flex align-items-center justify-content-between">
     <div><i class="bi bi-clock-history me-2 text-secondary"></i>{{ _('Transaction History') }}</div>
@@ -268,12 +292,13 @@
 </div>
 
 <script>
-  // --- helpers ---
+  // Помощна функция за пари (2 знака)
   const money = (n) => (isNaN(n) ? 0 : n).toFixed(2);
 
-  // role guard (UI side). Backend already blocks, this is just nicer UX.
+  // Проверка за роля (само за UX, backend пак пази)
   const isSalesAgent = {{ 'true' if current_user.role == 'Sales Agent' else 'false' }};
 
+  // Взимам наличност за продукт в избран склад (за Sale)
   async function fetchStock(warehouseId, productId) {
     if (!warehouseId || !productId) return null;
 
@@ -300,12 +325,14 @@
     row.dataset.available = '';
   }
 
+  // Смятам сума за ред (qty * unit price)
   function updateLineTotal(row) {
     const qty = parseFloat(row.querySelector('.qty-input')?.value || 0);
     const price = parseFloat(row.querySelector('.price-input')?.value || 0);
     row.querySelector('.line-total').value = money(qty * price);
   }
 
+  // Смятам общата сума от всички редове
   function updateGrandTotal() {
     let sum = 0;
     document.querySelectorAll('.txn-row').forEach(row => {
@@ -315,6 +342,7 @@
     document.getElementById('grandTotal').textContent = money(sum);
   }
 
+  // Автоматично попълвам цена според типа (Purchase/Sale), ако полето е празно
   function autofillUnitPrice(row) {
     const type = document.getElementById('txnType').value;
     const sel = row.querySelector('.product-select');
@@ -336,6 +364,7 @@
     if (type === 'Sale') priceInput.value = money(sell);
   }
 
+  // При Sale: не позволявам qty > available (само ако вече знаем наличност)
   function validateSaleQty(row) {
     const type = document.getElementById('txnType').value;
     const qty = parseInt(row.querySelector('.qty-input')?.value || 0, 10);
@@ -344,13 +373,11 @@
     const qtyInput = row.querySelector('.qty-input');
     if (!qtyInput) return true;
 
-    // validate only for Sale
     if (type !== 'Sale') {
       qtyInput.classList.remove('is-invalid');
       return true;
     }
 
-    // if we don't know stock yet, don't block
     if (isNaN(available)) return true;
 
     if (qty > available) {
@@ -362,6 +389,7 @@
     }
   }
 
+  // Бутонът Record се изключва, ако има невалидно количество при Sale
   function updateSubmitState() {
     const type = document.getElementById('txnType').value;
     const btn = document.querySelector('#txnForm button[type="submit"]');
@@ -380,6 +408,7 @@
     btn.disabled = !ok;
   }
 
+  // Обновявам наличностите за ред (само при Sale)
   async function refreshRowStock(row) {
     const type = document.getElementById('txnType').value;
     const warehouseId = document.getElementById('warehouseSelect')?.value;
@@ -399,6 +428,7 @@
     if (qty !== null) setRowStockHint(row, qty);
   }
 
+  // Връзвам event-и към един ред (qty/price/product/remove)
   function bindRow(row) {
     row.querySelector('.removeRowBtn')?.addEventListener('click', () => {
       const allRows = document.querySelectorAll('.txn-row');
@@ -438,7 +468,7 @@
     });
   }
 
-  // --- add row ---
+  // Добавям нов ред (клонирам първия и чистя стойностите)
   document.getElementById('addRowBtn').addEventListener('click', async () => {
     const container = document.getElementById('rowsContainer');
     const first = container.querySelector('.txn-row');
@@ -459,7 +489,7 @@
     updateSubmitState();
   });
 
-  // warehouse change refreshes stock for all rows
+  // Смяна на склад: презареждам наличностите за всички редове
   document.getElementById('warehouseSelect')?.addEventListener('change', async () => {
     for (const row of document.querySelectorAll('.txn-row')) {
       await refreshRowStock(row);
@@ -468,7 +498,7 @@
     updateSubmitState();
   });
 
-  // type change should allow refilling price if empty + refresh stock hints
+  // Смяна на тип: пренастройвам цени и наличности
   document.getElementById('txnType').addEventListener('change', async () => {
     if (isSalesAgent) {
       document.getElementById('txnType').value = 'Sale';
@@ -485,7 +515,7 @@
     updateSubmitState();
   });
 
-  // initial guard: sales agent default type + bind initial row
+  // Начално зареждане (bind + първоначални проверки)
   window.addEventListener('DOMContentLoaded', async () => {
     if (isSalesAgent) {
       document.getElementById('txnType').value = 'Sale';
@@ -493,7 +523,6 @@
 
     document.querySelectorAll('.txn-row').forEach(bindRow);
 
-    // if warehouse + product already selected, refresh stock
     for (const row of document.querySelectorAll('.txn-row')) {
       await refreshRowStock(row);
       validateSaleQty(row);
@@ -502,7 +531,7 @@
     updateSubmitState();
   });
 
-  // reset button: totals + hints
+  // Reset: връщам суми и скривам подсказки
   document.getElementById('resetBtn').addEventListener('click', () => {
     setTimeout(() => {
       if (isSalesAgent) {

@@ -11,7 +11,8 @@ bp = Blueprint("main", __name__)
 
 
 def _get_owner_id():
-    # returns only an int owner_id or None
+    # тук решавам за коя фирма (owner) работи текущия user
+    # developer не е вързан към фирма
     if current_user.role == "Developer":
         return None
     if current_user.role == "Admin / Owner":
@@ -19,52 +20,56 @@ def _get_owner_id():
     return current_user.created_by_id
 
 
-
 def _month_start(dt: datetime) -> datetime:
+    # правя дата за началото на месеца
     return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _add_months(dt: datetime, months: int) -> datetime:
-    # Simple month add without external libs
+    # добавям месеци без допълнителни библиотеки
+    # винаги връщам 1-во число на месеца 00:00
     year = dt.year + (dt.month - 1 + months) // 12
     month = (dt.month - 1 + months) % 12 + 1
     return dt.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 # --------------------------
-# PUBLIC LANDING (NO LOGIN)
+# ПУБЛИЧНА LANDING СТРАНИЦА
 # --------------------------
 @bp.route("/")
 def landing():
+    # ако е логнат го пращам към правилния dashboard
     if current_user.is_authenticated:
         if (current_user.role or "").strip() == "Developer":
             return redirect(url_for("users.developer_dashboard"))
         return redirect(url_for("main.index"))
+
+    # ако не е логнат показвам landing
     return render_template("landing.html")
 
 
-
 # --------------------------
-# DASHBOARD (LOGIN REQUIRED)
+# DASHBOARD СЛЕД LOGIN
 # --------------------------
 @bp.route("/dashboard")
 @login_required
 def index():
-  
+    # developer си има отделно табло
     if (current_user.role or "").strip() == "Developer":
         return redirect(url_for("users.developer_dashboard"))
 
     owner_id = _get_owner_id()
+
+    # ако не мога да намеря owner_id най безопасното е logout
     if not owner_id:
         return redirect(url_for("auth.logout"))
 
-
-
-    # -------------------- Base counts (org scoped) -------------------- #
+    # -------------------- Базови бройки за фирмата -------------------- #
     total_products = Product.query.filter_by(owner_id=owner_id).count()
     total_warehouses = Warehouse.query.filter_by(owner_id=owner_id).count()
     total_partners = Partner.query.filter_by(owner_id=owner_id).count()
 
+    # транзакциите ги смятам през warehouse за да е сигурно org scoping
     total_transactions = (
         Transaction.query
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -72,15 +77,16 @@ def index():
         .count()
     )
 
-    # -------------------- Date ranges -------------------- #
+    # -------------------- Дати за този месец и 12 месеца назад -------------------- #
     now = datetime.utcnow()
     this_month_start = _month_start(now)
     next_month_start = _add_months(this_month_start, 1)
 
-    # last 12 months including current month
+    # последните 12 месеца включително текущия
     start_12 = _add_months(this_month_start, -11)
 
-    # -------------------- This month money + counts -------------------- #
+    # -------------------- Пари и бройки за този месец -------------------- #
+    # взимам id-та на транзакциите този месец за тази фирма
     base_txn_ids = (
         db.session.query(Transaction.id)
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -89,6 +95,7 @@ def index():
         .subquery()
     )
 
+    # оборот от продажби този месец
     month_sales_total = (
         db.session.query(func.coalesce(func.sum(TransactionItem.total_price), 0.0))
         .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -98,6 +105,7 @@ def index():
         or 0.0
     )
 
+    # стойност на покупки този месец
     month_purchases_total = (
         db.session.query(func.coalesce(func.sum(TransactionItem.total_price), 0.0))
         .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -107,6 +115,7 @@ def index():
         or 0.0
     )
 
+    # печалба от продажби този месец
     month_profit = (
         db.session.query(func.coalesce(func.sum(TransactionItem.profit), 0.0))
         .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -116,6 +125,7 @@ def index():
         or 0.0
     )
 
+    # брой продажби този месец
     month_sales_count = (
         Transaction.query
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -125,6 +135,7 @@ def index():
         .count()
     )
 
+    # брой покупки този месец
     month_purchase_count = (
         Transaction.query
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -134,9 +145,10 @@ def index():
         .count()
     )
 
+    # нетен поток = продажби - покупки
     month_net_flow = float(month_sales_total) - float(month_purchases_total)
 
-    # -------------------- Charts (last 12 months) -------------------- #
+    # -------------------- Данни за графиките (последни 12 месеца) -------------------- #
     months = []
     txn_counts = []
     sale_counts = []
@@ -149,8 +161,11 @@ def index():
     for i in range(12):
         m_start = _add_months(start_12, i)
         m_end = _add_months(m_start, 1)
+
+        # показвам само съкращението на месеца Jan Feb Mar
         months.append(m_start.strftime("%b"))
 
+        # база за броя транзакции
         m_txn_q = (
             Transaction.query
             .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -162,6 +177,7 @@ def index():
         sale_counts.append(m_txn_q.filter(Transaction.type == "Sale").count())
         purchase_counts.append(m_txn_q.filter(Transaction.type == "Purchase").count())
 
+        # сума продажби за месеца
         sale_total = (
             db.session.query(func.coalesce(func.sum(TransactionItem.total_price), 0.0))
             .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -173,6 +189,7 @@ def index():
             or 0.0
         )
 
+        # сума покупки за месеца
         purchase_total = (
             db.session.query(func.coalesce(func.sum(TransactionItem.total_price), 0.0))
             .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -184,6 +201,7 @@ def index():
             or 0.0
         )
 
+        # печалба за месеца (само от продажби)
         profit_total = (
             db.session.query(func.coalesce(func.sum(TransactionItem.profit), 0.0))
             .join(Transaction, TransactionItem.transaction_id == Transaction.id)
@@ -199,7 +217,7 @@ def index():
         purchase_amounts.append(float(purchase_total))
         profit_amounts.append(float(profit_total))
 
-    # -------------------- Products by category -------------------- #
+    # -------------------- Категории за donut chart -------------------- #
     category_data = (
         db.session.query(Product.category, func.count(Product.id))
         .filter(Product.owner_id == owner_id)
@@ -210,7 +228,8 @@ def index():
     product_categories = [(cat or "Unknown") for (cat, _) in category_data]
     product_counts = [int(cnt) for (_, cnt) in category_data]
 
-    # -------------------- Low stock -------------------- #
+    # -------------------- Low stock списък -------------------- #
+    # по default е 10 ако не е настроено в Settings
     threshold = 10
     try:
         if g.app_config and getattr(g.app_config, "low_stock_threshold", None) is not None:
@@ -232,7 +251,7 @@ def index():
         .all()
     )
 
-    # -------------------- Latest transactions -------------------- #
+    # -------------------- Последни транзакции -------------------- #
     recent_txns = (
         Transaction.query
         .join(Warehouse, Transaction.warehouse_id == Warehouse.id)
@@ -247,7 +266,7 @@ def index():
         .all()
     )
 
-    # -------------------- Top products (last 30 days) -------------------- #
+    # -------------------- Топ продукти (последни 30 дни) -------------------- #
     cutoff = now - timedelta(days=30)
 
     top_products = (
@@ -271,6 +290,7 @@ def index():
         .all()
     )
 
+    # пращам всичко към dashboard template-а
     return render_template(
         "index.html",
         total_products=total_products,
@@ -278,7 +298,7 @@ def index():
         total_transactions=total_transactions,
         total_partners=total_partners,
 
-        # this month
+        # този месец
         month_sales_total=month_sales_total,
         month_purchases_total=month_purchases_total,
         month_profit=month_profit,
@@ -286,7 +306,7 @@ def index():
         month_sales_count=month_sales_count,
         month_purchase_count=month_purchase_count,
 
-        # charts
+        # графики
         transaction_months=months,
         transaction_counts=txn_counts,
         sale_counts=sale_counts,
@@ -295,14 +315,14 @@ def index():
         purchase_amounts=purchase_amounts,
         profit_amounts=profit_amounts,
 
-        # category donut
+        # donut
         product_categories=product_categories,
         product_counts=product_counts,
 
-        # keep
+        # таблици
         low_stock=low_stock,
         recent_txns=recent_txns,
 
-        # new
+        # top продукти
         top_products=top_products,
     )

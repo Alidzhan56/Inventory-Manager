@@ -15,12 +15,8 @@ bp = Blueprint("products", __name__)
 
 
 def _get_owner_id():
-    """
-    Org logic:
-    - Admin/Owner owns the org
-    - other roles belong to owner via created_by_id
-    - Developer is special (no owner scope), but we avoid letting it create/edit org data accidentally
-    """
+    # определям към коя фирма е user-а
+    # developer няма owner scope
     if current_user.role == "Developer":
         return None
     if current_user.role == "Admin / Owner":
@@ -74,7 +70,7 @@ def add_product():
 
     owner_id = _get_owner_id()
 
-    # Avoid creating "ownerless" data
+    # не позволявам да се създава продукт без owner
     if owner_id is None:
         flash(_("Developer must add products from an owner context."), "warning")
         return redirect(url_for("products.products"))
@@ -85,7 +81,6 @@ def add_product():
     warehouse_id = request.form.get("warehouse_id")
     image_file = request.files.get("image")
 
-    # safe conversions
     try:
         quantity = int(request.form.get("quantity", 0))
     except (ValueError, TypeError):
@@ -119,13 +114,13 @@ def add_product():
         flash(_("Invalid warehouse selected."), "danger")
         return redirect(url_for("products.products"))
 
-    # make sure warehouse belongs to this org
+    # проверявам дали warehouse-а е от същата фирма
     warehouse = Warehouse.query.filter_by(id=warehouse_id, owner_id=owner_id).first()
     if not warehouse:
         flash(_("Invalid warehouse selected."), "danger")
         return redirect(url_for("products.products"))
 
-    # handle image
+    # качване на снимка ако има
     image_relpath = None
     if image_file and image_file.filename:
         filename = secure_filename(image_file.filename)
@@ -133,14 +128,13 @@ def add_product():
         image_file.save(os.path.join(current_app.config["UPLOAD_FOLDER"], filename))
         image_relpath = f"uploads/{filename}"
 
-    # SKU unique per owner
+    # SKU е уникално за даден owner
     existing = Product.query.filter_by(sku=sku, owner_id=owner_id).first()
     if existing:
-        # product exists => just add stock for this warehouse
+        # ако продуктът вече съществува добавям само наличност
         stock = _get_or_create_stock(existing.id, warehouse_id)
         stock.quantity = (stock.quantity or 0) + max(quantity, 0)
 
-        # update defaults if given
         existing.default_purchase_price = purchase_price
         existing.default_sell_price = sell_price
         if category:
@@ -148,14 +142,13 @@ def add_product():
         if image_relpath:
             existing.image = image_relpath
 
-        # legacy sync (temporary)
+        # временна синхронизация на legacy quantity
         existing.quantity = sum((s.quantity or 0) for s in existing.stocks)
 
         db.session.commit()
         flash(_("Product already exists. Stock was added to the selected warehouse."), "success")
         return redirect(url_for("products.products"))
 
-    # create new product (global per owner)
     new_product = Product(
         name=name,
         sku=sku,
@@ -164,7 +157,7 @@ def add_product():
         default_sell_price=sell_price,
         image=image_relpath,
         owner_id=owner_id,
-        warehouse_id=warehouse_id,  # legacy field, keep for now
+        warehouse_id=warehouse_id,  # legacy поле
     )
     db.session.add(new_product)
     db.session.flush()
@@ -172,7 +165,7 @@ def add_product():
     stock = _get_or_create_stock(new_product.id, warehouse_id)
     stock.quantity = (stock.quantity or 0) + max(quantity, 0)
 
-    # legacy sync (temporary)
+    # временна синхронизация
     new_product.quantity = sum((s.quantity or 0) for s in new_product.stocks)
 
     db.session.commit()
@@ -195,12 +188,10 @@ def edit_product(id):
 
     product = Product.query.filter_by(id=id, owner_id=owner_id).first_or_404()
 
-    # basic fields
     product.name = (request.form.get("name") or product.name).strip()
     product.sku = (request.form.get("sku") or product.sku).strip()
     product.category = (request.form.get("category") or "").strip() or None
 
-    # prices
     try:
         product.default_purchase_price = float(
             request.form.get("purchase_price", product.default_purchase_price) or 0
@@ -215,7 +206,7 @@ def edit_product(id):
     except (ValueError, TypeError):
         pass
 
-    # SKU conflict check per owner
+    # проверка за конфликтен SKU
     conflict = Product.query.filter(
         Product.owner_id == owner_id,
         Product.sku == product.sku,
@@ -225,7 +216,6 @@ def edit_product(id):
         flash(_("Another product with the same SKU already exists."), "warning")
         return redirect(url_for("products.products"))
 
-    # optional: set stock for a specific warehouse
     warehouse_id = request.form.get("warehouse_id")
     stock_qty = request.form.get("stock_qty")
 
@@ -250,9 +240,8 @@ def edit_product(id):
             if stock_qty is not None and stock_qty >= 0:
                 stock = _get_or_create_stock(product.id, warehouse_id)
                 stock.quantity = stock_qty
-                product.warehouse_id = warehouse_id  # legacy pointer
+                product.warehouse_id = warehouse_id  # legacy поле
 
-    # image upload (optional)
     image_file = request.files.get("image")
     if image_file and image_file.filename:
         filename = secure_filename(image_file.filename)
@@ -261,7 +250,7 @@ def edit_product(id):
         image_file.save(filepath)
         product.image = f"uploads/{filename}"
 
-    # legacy sync (temporary)
+    # временна синхронизация
     product.quantity = sum((s.quantity or 0) for s in product.stocks)
 
     db.session.commit()
@@ -284,12 +273,13 @@ def delete_product(id):
 
     product = Product.query.filter_by(id=id, owner_id=owner_id).first_or_404()
 
-    # Safety checks: don't delete if product has stock or has transactions
+    # не трия ако има наличност
     has_stock = any((s.quantity or 0) > 0 for s in product.stocks)
     if has_stock:
         flash(_("Cannot delete this product because it still has stock."), "warning")
         return redirect(url_for("products.products"))
 
+    # не трия ако е използван в транзакции
     used_in_txn = TransactionItem.query.filter_by(product_id=product.id).first() is not None
     if used_in_txn:
         flash(_("Cannot delete this product because it is used in transactions."), "warning")
