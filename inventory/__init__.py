@@ -2,7 +2,7 @@ import os
 from flask import Flask, g, request, redirect, url_for, flash
 from config import config
 
-from inventory.extensions import db, login_manager
+from inventory.extensions import db, login_manager, migrate
 from inventory.models import User, AppConfig
 from inventory.utils.translations import set_language, _
 
@@ -10,34 +10,28 @@ from inventory.utils.translations import set_language, _
 def create_app(config_name="default"):
     """
     App factory
-    тук сглобявам Flask приложението
-    зареждам config
-    връзвам extensions
-    регистрирам blueprints
+    сглобява Flask приложението
     """
     app = Flask(__name__)
 
-    # зареждам конфигурацията според environment-а
+    # конфигурация
     app.config.from_object(config[config_name])
 
-    # папка за качени снимки и файлове
+    # upload папка
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # връзвам базата и login manager-а към app
+    # extensions
     db.init_app(app)
     login_manager.init_app(app)
+    migrate.init_app(app, db)
 
     @login_manager.user_loader
     def load_user(user_id):
-        # flask-login използва това за да зареди текущия user от DB
         return User.query.get(int(user_id))
 
     @app.before_request
     def before_request():
-        # езикът да е готов за всеки request
         set_language(app)
-
-        # по подразбиране няма фирмен config
         g.app_config = None
 
         from flask_login import current_user
@@ -46,32 +40,21 @@ def create_app(config_name="default"):
 
         role = (current_user.role or "").strip()
 
-        # ако user е създаден от админ и е маркиран да смени парола
-        # пускам го само към change_password logout и static
+        # force password change
         if role != "Developer" and current_user.created_by_id is not None and getattr(current_user, "force_password_change", False):
             endpoint = request.endpoint or ""
-
-            allowed_endpoints = {
-                "settings.change_password",
-                "auth.logout",
-                "static",
-            }
-
-            if endpoint not in allowed_endpoints:
+            allowed = {"settings.change_password", "auth.logout", "static"}
+            if endpoint not in allowed:
                 flash(_("⚠️ You must change your password to continue."), "warning")
                 return redirect(url_for("settings.change_password"))
 
-        # developer не зарежда фирмени настройки
         if role == "Developer":
             return
 
-        # намирам owner на организацията
         owner_id = current_user.id if role == "Admin / Owner" else current_user.created_by_id
         if not owner_id:
             return
 
-        # взимам AppConfig за организацията
-        # ако няма създавам дефолтен
         config_obj = AppConfig.query.filter_by(owner_id=owner_id).first()
         if not config_obj:
             config_obj = AppConfig(
@@ -87,11 +70,22 @@ def create_app(config_name="default"):
 
         g.app_config = config_obj
 
-    # правя _() достъпно в template-ите
+   
     app.jinja_env.globals.update(_=_)
 
-    # blueprints
-    from inventory.routes import auth, products, warehouses, partners, transactions, users, settings, main, reports
+ 
+    from inventory.routes import (
+        auth,
+        products,
+        warehouses,
+        partners,
+        transactions,
+        users,
+        settings,
+        main,
+        reports,
+        legal,     
+    )
 
     app.register_blueprint(auth.bp)
     app.register_blueprint(products.bp)
@@ -102,8 +96,9 @@ def create_app(config_name="default"):
     app.register_blueprint(settings.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(reports.bp)
+    app.register_blueprint(legal.bp)   
 
-    # създавам таблиците и ако има env променливи правя developer user
+    # DB init + dev user
     with app.app_context():
         db.create_all()
 
@@ -112,17 +107,15 @@ def create_app(config_name="default"):
         dev_password = os.environ.get("DEV_PASSWORD")
 
         if dev_email and dev_password:
-            existing = User.query.filter_by(email=dev_email).first()
-            if not existing:
+            if not User.query.filter_by(email=dev_email).first():
                 from werkzeug.security import generate_password_hash
-                dev_user = User(
+                db.session.add(User(
                     username=dev_username,
                     email=dev_email,
-                    password=generate_password_hash(dev_password, method="pbkdf2:sha256"),
+                    password=generate_password_hash(dev_password),
                     role="Developer",
                     force_password_change=False,
-                )
-                db.session.add(dev_user)
+                ))
                 db.session.commit()
 
     return app

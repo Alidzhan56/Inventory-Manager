@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Terms') }} · WarePulse{% endblock %}
+{% block content %}
+
+<div class="container py-4" style="max-width: 900px;">
+  <h3 class="fw-bold mb-3">{{ _('Terms of Service') }}</h3>
+  <p class="text-muted mb-4">{{ _('Last updated') }}: 2026-02-15</p>
+
+  <div class="card">
+    <div class="card-body">
+
+      <h5 class="fw-semibold">{{ _('1. Overview') }}</h5>
+      <p>{{ _('WarePulse is an inventory and transaction management web application. These Terms explain the rules for using the service.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('2. Accounts') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('You are responsible for keeping your login credentials secure.') }}</li>
+        <li>{{ _('Do not share accounts between multiple people unless your organization allows it.') }}</li>
+        <li>{{ _('We may suspend accounts in case of abuse, security risk, or illegal activity.') }}</li>
+      </ul>
+
+      <h5 class="fw-semibold mt-4">{{ _('3. Acceptable use') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('Do not attempt to hack, disrupt, or bypass access controls.') }}</li>
+        <li>{{ _('Do not upload illegal or harmful content.') }}</li>
+        <li>{{ _('Do not misuse the system to access other organizations data.') }}</li>
+      </ul>
+
+      <h5 class="fw-semibold mt-4">{{ _('4. Data and ownership') }}</h5>
+      <p>{{ _('Your organization owns the business data you enter in WarePulse. You are responsible for the accuracy of that data.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('5. Availability') }}</h5>
+      <p>{{ _('The service may be temporarily unavailable due to maintenance, updates, or technical issues.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('6. Changes') }}</h5>
+      <p>{{ _('We may update these Terms when the product evolves. If changes are important, we will provide a notice inside the app.') }}</p>
+
+     
+    </div>
+  </div>
+</div>
+
+{% endblock %}

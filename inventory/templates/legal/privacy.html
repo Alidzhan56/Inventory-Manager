@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Privacy') }} · WarePulse{% endblock %}
+{% block content %}
+
+<div class="container py-4" style="max-width: 900px;">
+  <h3 class="fw-bold mb-3">{{ _('Privacy Policy') }}</h3>
+  <p class="text-muted mb-4">{{ _('Last updated') }}: 2026-02-15</p>
+
+  <div class="card">
+    <div class="card-body">
+
+      <h5 class="fw-semibold">{{ _('1. What we collect') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('Account data: username, email, role.') }}</li>
+        <li>{{ _('Security and login data: login time, IP address, country (based on IP), and user-agent for auditing and security.') }}</li>
+        <li>{{ _('Business data: products, warehouses, partners, transactions, and stock movements that you enter.') }}</li>
+      </ul>
+
+      <h5 class="fw-semibold mt-4">{{ _('2. Why we collect it') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('To provide the service and keep your organization data scoped correctly.') }}</li>
+        <li>{{ _('To secure accounts, detect suspicious logins, and keep an audit trail.') }}</li>
+        <li>{{ _('To generate reports and analytics inside your dashboard.') }}</li>
+      </ul>
+
+      <h5 class="fw-semibold mt-4">{{ _('3. Data sharing') }}</h5>
+      <p>{{ _('We do not sell your data. Data may be processed by infrastructure providers (hosting, database) only to operate the service.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('4. Data retention') }}</h5>
+      <p>{{ _('We keep data as long as the account is active, unless deletion is requested or required by law. Login history may be kept for security and audit purposes.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('5. Your rights') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('You can request access, correction, or deletion of your personal data.') }}</li>
+        <li>{{ _('You can request export of your organization data (when available).') }}</li>
+      </ul>
+
+      
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

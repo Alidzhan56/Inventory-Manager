@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Cookies') }} · WarePulse{% endblock %}
+{% block content %}
+
+<div class="container py-4" style="max-width: 900px;">
+  <h3 class="fw-bold mb-3">{{ _('Cookie Policy') }}</h3>
+  <p class="text-muted mb-4">{{ _('Last updated') }}: 2026-02-15</p>
+
+  <div class="card">
+    <div class="card-body">
+
+      <h5 class="fw-semibold">{{ _('1. What cookies we use') }}</h5>
+      <p>{{ _('WarePulse uses essential cookies to keep you logged in and to remember your language choice.') }}</p>
+
+      <h5 class="fw-semibold mt-4">{{ _('2. Essential cookies') }}</h5>
+      <ul class="mb-0">
+        <li>{{ _('Session cookie: required for authentication and security.') }}</li>
+        <li>{{ _('Language preference: used to remember BG/EN selection.') }}</li>
+      </ul>
+
+      <h5 class="fw-semibold mt-4">{{ _('3. Analytics cookies') }}</h5>
+      <p class="mb-0">{{ _('Currently we do not use third-party analytics cookies by default. If this changes, we will update this policy.') }}</p>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
