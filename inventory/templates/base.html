@@ -79,22 +79,38 @@
       border-radius: 12px;
     }
 
-    /* Смяна на език (BG/EN) */
+    /* Language pill (desktop) */
     .lang-pill a {
       color: rgba(255,255,255,0.75);
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 0.85rem;
       padding: 6px 10px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.12);
       margin-left: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 40px;
     }
     .lang-pill a.active,
     .lang-pill a:hover {
       color: #fff;
       border-color: rgba(255,255,255,0.22);
       background: rgba(255,255,255,0.06);
+    }
+
+    /* Better dropdown on dark topbar */
+    .dropdown-menu {
+      border-radius: 14px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.22);
+      border: 1px solid rgba(15,23,42,0.08);
+    }
+    .dropdown-item.active,
+    .dropdown-item:active {
+      background: rgba(13,110,253,0.15);
+      color: #0f172a;
     }
 
     /* Sidebar */
@@ -149,14 +165,13 @@
       transform: scale(0.99);
     }
 
-    /* Активен линк в менюто */
     .side-link.active {
       background: var(--link-active-bg);
       color: #fff;
       border: 1px solid rgba(13,110,253,0.35);
     }
 
-    /* Мобилно меню + overlay */
+    /* Mobile menu overlay */
     .sidebar-overlay {
       position: fixed;
       inset: 60px 0 0 0;
@@ -171,7 +186,6 @@
       .sidebar-overlay.open { display: block; }
     }
 
-    /* Отместване на съдържанието (за да не влиза под менюто) */
     .content-wrap {
       margin-top: 60px;
       min-height: calc(100vh - 60px);
@@ -192,7 +206,6 @@
       }
     }
 
-    /* Общи стилове за карти/таблици */
     .card {
       border: 0;
       border-radius: var(--radius);
@@ -206,7 +219,6 @@
     .table thead th { font-weight: 700; color: #334155; }
     .alert { border-radius: 14px; box-shadow: var(--shadow); border: 0; }
 
-    /* Footer */
     .footer { color: var(--muted); font-size: 0.85rem; padding: 16px 0 24px; }
     h1, h2, h3 { letter-spacing: -0.02em; }
   </style>
@@ -219,13 +231,11 @@
   <div class="container-fluid">
 
     {% if current_user.is_authenticated and current_user.role != 'Developer' %}
-      <!-- Бутон за отваряне на sidebar на телефон -->
       <button id="sidebarToggle" class="btn btn-sm btn-outline-light d-lg-none me-2" type="button">
         <i class="bi bi-list"></i>
       </button>
     {% endif %}
 
-    <!-- Линкът на логото води към различна страница според ролята -->
     <a class="navbar-brand brand"
        href="{% if current_user.is_authenticated %}
                 {% if current_user.role == 'Developer' %}
@@ -244,28 +254,47 @@
     </a>
 
     <div class="ms-auto d-flex align-items-center gap-2 top-actions">
-     <!-- Език -->
-<div class="lang-pill d-none d-sm-flex align-items-center">
-  <a href="?lang=bg" class="{% if g.lang=='bg' %}active{% endif %}">BG</a>
-  <a href="?lang=en" class="{% if g.lang=='en' %}active{% endif %}">EN</a>
-</div>
 
-<!-- Mobile language dropdown -->
-<div class="dropdown d-sm-none">
-  <a class="btn btn-outline-light btn-sm dropdown-toggle"
-     href="#" id="langDropdown" data-bs-toggle="dropdown" aria-expanded="false"
-     aria-label="{{ _('Language') }}">
-    <i class="bi bi-translate"></i>
-  </a>
-  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="langDropdown">
-    <li><a class="dropdown-item {% if g.lang=='bg' %}active{% endif %}" href="?lang=bg">BG</a></li>
-    <li><a class="dropdown-item {% if g.lang=='en' %}active{% endif %}" href="?lang=en">EN</a></li>
-  </ul>
-</div>
+      {# ===== Language switcher ===== #}
+      {% set current_path = request.full_path %}
+      {% if current_path.endswith('?') %}
+        {% set current_path = request.path %}
+      {% endif %}
 
+      <!-- Desktop pill -->
+      <div class="lang-pill d-none d-sm-flex align-items-center">
+        <a href="{{ current_path | replace('lang=bg', '') | replace('lang=en', '') }}{% if '?' in current_path %}&{% else %}?{% endif %}lang=bg"
+           class="{% if g.lang=='bg' %}active{% endif %}">BG</a>
+
+        <a href="{{ current_path | replace('lang=bg', '') | replace('lang=en', '') }}{% if '?' in current_path %}&{% else %}?{% endif %}lang=en"
+           class="{% if g.lang=='en' %}active{% endif %}">EN</a>
+      </div>
+
+      <!-- Mobile dropdown -->
+      <div class="dropdown d-sm-none">
+        <a class="btn btn-outline-light btn-sm dropdown-toggle"
+           href="#" id="langDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+           aria-label="{{ _('Switch language') }}">
+          <i class="bi bi-translate"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="langDropdown">
+          <li>
+            <a class="dropdown-item {% if g.lang=='bg' %}active{% endif %}"
+               href="{{ current_path | replace('lang=bg', '') | replace('lang=en', '') }}{% if '?' in current_path %}&{% else %}?{% endif %}lang=bg">
+              {{ _('Language') }}: BG
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item {% if g.lang=='en' %}active{% endif %}"
+               href="{{ current_path | replace('lang=bg', '') | replace('lang=en', '') }}{% if '?' in current_path %}&{% else %}?{% endif %}lang=en">
+              {{ _('Language') }}: EN
+            </a>
+          </li>
+        </ul>
+      </div>
+      {# ===== /Language switcher ===== #}
 
       {% if current_user.is_authenticated %}
-        <!-- Профил меню -->
         <div class="dropdown">
           <a class="btn btn-outline-light btn-sm dropdown-toggle d-flex align-items-center gap-2"
              href="#" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -285,11 +314,13 @@
               </li>
             {% endif %}
 
+            <li>
               <a class="dropdown-item d-flex align-items-center gap-2"
                  href="{{ url_for('settings.change_password') }}">
                  <i class="bi bi-shield-lock"></i>
                 {{ _('Change Password') }}
-             </a>
+              </a>
+            </li>
 
             <li>
               <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
@@ -299,7 +330,6 @@
           </ul>
         </div>
       {% else %}
-        <!-- Бутоните за вход/регистрация -->
         <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">{{ _('Login') }}</a>
         <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register_admin') }}">{{ _('Register') }}</a>
       {% endif %}
@@ -308,10 +338,8 @@
 </nav>
 
 {% if current_user.is_authenticated and current_user.role != 'Developer' %}
-  <!-- Overlay за мобилен sidebar -->
   <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
-  <!-- Sidebar меню -->
   <aside id="sidebar" class="sidebar">
     <div class="nav-group-label">{{ _('Menu') }}</div>
 
@@ -361,11 +389,9 @@
   </aside>
 {% endif %}
 
-<!-- Content -->
 <div class="content-wrap">
   <main class="main-content">
 
-    <!-- Flash съобщения -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -396,7 +422,6 @@
   const overlay = document.getElementById("sidebarOverlay");
   const toggle = document.getElementById("sidebarToggle");
 
-  // Отваряне/затваряне на sidebar (за мобилни устройства)
   function openSidebar() {
     if (!sidebar) return;
     sidebar.classList.add("open");
@@ -417,14 +442,12 @@
 
   if (overlay) overlay.addEventListener("click", closeSidebar);
 
-  // Като натисна меню линк на телефон - затварям sidebar-а
   document.querySelectorAll(".side-link").forEach(link => {
     link.addEventListener("click", () => {
       if (window.innerWidth < 992) closeSidebar();
     });
   });
 
-  // Ако се върна на desktop размер - махам overlay-а и sidebar state-а
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 992) {
       if (overlay) overlay.classList.remove("open");
