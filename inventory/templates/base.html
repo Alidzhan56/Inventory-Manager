@@ -244,11 +244,25 @@
     </a>
 
     <div class="ms-auto d-flex align-items-center gap-2 top-actions">
-      <!-- Език -->
-      <div class="lang-pill d-none d-sm-flex align-items-center">
-        <a href="?lang=bg" class="{% if g.lang=='bg' %}active{% endif %}">BG</a>
-        <a href="?lang=en" class="{% if g.lang=='en' %}active{% endif %}">EN</a>
-      </div>
+     <!-- Език -->
+<div class="lang-pill d-none d-sm-flex align-items-center">
+  <a href="?lang=bg" class="{% if g.lang=='bg' %}active{% endif %}">BG</a>
+  <a href="?lang=en" class="{% if g.lang=='en' %}active{% endif %}">EN</a>
+</div>
+
+<!-- Mobile language dropdown -->
+<div class="dropdown d-sm-none">
+  <a class="btn btn-outline-light btn-sm dropdown-toggle"
+     href="#" id="langDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+     aria-label="{{ _('Language') }}">
+    <i class="bi bi-translate"></i>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="langDropdown">
+    <li><a class="dropdown-item {% if g.lang=='bg' %}active{% endif %}" href="?lang=bg">BG</a></li>
+    <li><a class="dropdown-item {% if g.lang=='en' %}active{% endif %}" href="?lang=en">EN</a></li>
+  </ul>
+</div>
+
 
       {% if current_user.is_authenticated %}
         <!-- Профил меню -->
