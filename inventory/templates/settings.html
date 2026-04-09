@@ -1,66 +1,52 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Settings') }} · WarePulse{% endblock %}
+{% block title %}{{ _('Change Password') }} · WarePulse{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
 
   <div class="mb-4">
-    <h3 class="fw-bold mb-0">{{ _('Settings') }}</h3>
-    <div class="text-muted mt-1">{{ _('Manage company preferences and inventory rules.') }}</div>
+    <h3 class="fw-bold mb-0">{{ _('Change Password') }}</h3>
+    <div class="text-muted mt-1">{{ _('Update your account password to continue.') }}</div>
   </div>
+
+  {% if current_user.is_authenticated and not current_user.email_verified %}
+  <div class="alert alert-warning">
+    {{ _('Your email address is not verified yet. Please check your email and open the confirmation link.') }}
+  </div>
+
+  <form method="POST" action="{{ url_for('auth.resend_verification_email') }}" class="mb-3">
+    <button type="submit" class="btn btn-outline-warning">
+      {{ _('Send Verification Email Again') }}
+    </button>
+  </form>
+  {% endif %}
 
   <form method="POST" class="card shadow-sm border-0">
     <div class="card-header bg-white fw-semibold d-flex align-items-center">
-      <i class="bi bi-gear me-2 text-primary"></i>{{ _('Company Settings') }}
+      <i class="bi bi-shield-lock me-2 text-primary"></i>{{ _('Password Security') }}
     </div>
 
     <div class="card-body">
       <div class="row g-3">
 
-        <!-- Основни данни за фирмата -->
         <div class="col-md-6">
-          <label class="form-label">{{ _('Company Name') }}</label>
-          <input type="text" name="company_name" class="form-control" value="{{ config.company_name }}" required>
+          <label class="form-label">{{ _('Current Password') }}</label>
+          <input type="password" name="current_password" class="form-control" required>
         </div>
 
-        <!-- Избор на валута за цени/отчети -->
-        <div class="col-md-3">
-          <label class="form-label">{{ _('Currency') }}</label>
-          <select name="currency" class="form-select">
-            <option value="EUR" {% if config.currency == 'EUR' %}selected{% endif %}>EUR</option>
-            <option value="USD" {% if config.currency == 'USD' %}selected{% endif %}>USD</option>
-          </select>
+        <div class="col-md-6">
+          <label class="form-label">{{ _('New Password') }}</label>
+          <input type="password" name="new_password" class="form-control" required>
         </div>
 
-        <!-- Език по подразбиране -->
-        <div class="col-md-3">
-          <label class="form-label">{{ _('Default Language') }}</label>
-          <select name="default_language" class="form-select">
-            <option value="en" {% if config.default_language == 'en' %}selected{% endif %}>English</option>
-            <option value="bg" {% if config.default_language == 'bg' %}selected{% endif %}>Български</option>
-          </select>
+        <div class="col-md-6">
+          <label class="form-label">{{ _('Confirm Password') }}</label>
+          <input type="password" name="confirm_password" class="form-control" required>
         </div>
 
-        <!-- Праг за “Low Stock” -->
-        <div class="col-md-4">
-          <label class="form-label">{{ _('Low Stock Threshold') }}</label>
-          <input type="number" min="0" name="low_stock_threshold" class="form-control"
-                 value="{{ config.low_stock_threshold if config.low_stock_threshold is not none else 5 }}">
+        <div class="col-12">
           <div class="form-text">
-            {{ _('Products at or below this quantity will show up in Low Stock.') }}
-          </div>
-        </div>
-
-        <!-- Включване/изключване на известия -->
-        <div class="col-md-4">
-          <label class="form-label">{{ _('Notifications') }}</label>
-          <div class="form-check form-switch mt-2">
-            <input class="form-check-input" type="checkbox" role="switch"
-                   name="notifications_enabled" id="notifSwitch"
-                   {% if config.notifications_enabled %}checked{% endif %}>
-            <label class="form-check-label" for="notifSwitch">
-              {{ _('Enable notifications') }}
-            </label>
+            {{ _('Password must be at least 8 characters and include uppercase, lowercase, number, and symbol.') }}
           </div>
         </div>
 
@@ -69,7 +55,7 @@
 
     <div class="card-footer bg-white d-flex gap-2">
       <button class="btn btn-primary">
-        <i class="bi bi-check2-circle me-1"></i>{{ _('Save Changes') }}
+        <i class="bi bi-check2-circle me-1"></i>{{ _('Change Password') }}
       </button>
       <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
         {{ _('Cancel') }}

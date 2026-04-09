@@ -28,6 +28,10 @@ class User(db.Model, UserMixin):
     force_password_change = db.Column(db.Boolean, default=False, nullable=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
 
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
+    verification_sent_at = db.Column(db.DateTime, nullable=True)
+
     # по желание за брандинг ако решиш да го ползваш
     company_name = db.Column(db.String(150), nullable=True)
 

@@ -1,11 +1,8 @@
-# inventory/routes/settings.py
-
 import re
 from datetime import datetime
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from werkzeug.security import check_password_hash, generate_password_hash
 
 from inventory.extensions import db
 from inventory.models import AppConfig
@@ -97,7 +94,7 @@ def change_password():
         new_pw = request.form.get("new_password") or ""
         confirm_pw = request.form.get("confirm_password") or ""
 
-        if not check_password_hash(current_user.password, current_pw):
+        if not current_user.check_password(current_pw):
             flash(_("Current password is incorrect."), "danger")
             return redirect(url_for("settings.change_password"))
 
@@ -114,10 +111,15 @@ def change_password():
             flash(_("Password does not meet requirements."), "danger")
             return redirect(url_for("settings.change_password"))
 
-        current_user.password = generate_password_hash(new_pw, method="pbkdf2:sha256")
-        current_user.password_changed_at = datetime.utcnow()
-        current_user.force_password_change = False
+        current_user.set_password(new_pw)
+        db.session.add(current_user)
         db.session.commit()
+        db.session.refresh(current_user)
+
+        if not getattr(current_user, "email_verified", False):
+            flash(_("Password changed successfully."), "success")
+            flash(_("Please verify your email address to continue."), "warning")
+            return redirect(url_for("settings.change_password"))
 
         flash(_("Password changed successfully."), "success")
 

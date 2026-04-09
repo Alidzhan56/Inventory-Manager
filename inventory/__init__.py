@@ -2,28 +2,24 @@ import os
 from flask import Flask, g, request, redirect, url_for, flash
 from config import config
 
-from inventory.extensions import db, login_manager, migrate
+from inventory.extensions import db, login_manager, migrate, mail
 from inventory.models import User, AppConfig
 from inventory.utils.translations import set_language, _
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def create_app(config_name="default"):
-    """
-    App factory
-    сглобява Flask приложението
-    """
     app = Flask(__name__)
 
-    # конфигурация
     app.config.from_object(config[config_name])
 
-    # upload папка
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # extensions
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
+    mail.init_app(app)
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -39,14 +35,28 @@ def create_app(config_name="default"):
             return
 
         role = (current_user.role or "").strip()
+        endpoint = request.endpoint or ""
 
-        # force password change
-        if role != "Developer" and current_user.created_by_id is not None and getattr(current_user, "force_password_change", False):
-            endpoint = request.endpoint or ""
-            allowed = {"settings.change_password", "auth.logout", "static"}
-            if endpoint not in allowed:
-                flash(_("⚠️ You must change your password to continue."), "warning")
-                return redirect(url_for("settings.change_password"))
+        allowed = {
+            "settings.change_password",
+            "auth.logout",
+            "auth.verify_email",
+            "auth.resend_verification_email",
+            "static",
+        }
+
+        if role != "Developer" and current_user.created_by_id is not None:
+            if getattr(current_user, "force_password_change", False):
+                if endpoint not in allowed:
+                    flash(_("You must change your password to continue."), "warning")
+                    if not getattr(current_user, "email_verified", False):
+                        flash(_("You must also verify your email address."), "warning")
+                    return redirect(url_for("settings.change_password"))
+
+            if not getattr(current_user, "email_verified", False):
+                if endpoint not in allowed:
+                    flash(_("You must verify your email address to continue."), "warning")
+                    return redirect(url_for("settings.change_password"))
 
         if role == "Developer":
             return
@@ -70,10 +80,8 @@ def create_app(config_name="default"):
 
         g.app_config = config_obj
 
-   
     app.jinja_env.globals.update(_=_)
 
- 
     from inventory.routes import (
         auth,
         products,
@@ -84,7 +92,7 @@ def create_app(config_name="default"):
         settings,
         main,
         reports,
-        legal,     
+        legal,
     )
 
     app.register_blueprint(auth.bp)
@@ -96,9 +104,8 @@ def create_app(config_name="default"):
     app.register_blueprint(settings.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(reports.bp)
-    app.register_blueprint(legal.bp)   
+    app.register_blueprint(legal.bp)
 
-    # DB init + dev user
     with app.app_context():
         db.create_all()
 
@@ -111,10 +118,11 @@ def create_app(config_name="default"):
                 from werkzeug.security import generate_password_hash
                 db.session.add(User(
                     username=dev_username,
-                    email=dev_email,
+                    email=dev_email.lower(),
                     password=generate_password_hash(dev_password),
                     role="Developer",
                     force_password_change=False,
+                    email_verified=True,
                 ))
                 db.session.commit()
 

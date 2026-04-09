@@ -221,6 +221,43 @@
 
     .footer { color: var(--muted); font-size: 0.85rem; padding: 16px 0 24px; }
     h1, h2, h3 { letter-spacing: -0.02em; }
+
+
+  
+.brand{
+  flex: 1 1 auto;   
+  min-width: 0;     
+}
+
+.top-actions{
+  flex: 0 0 auto;  
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px){
+  .brand{ min-width: 0; }
+  .brand .company{ display:none; }
+  .brand img{ width:34px; height:34px; }
+}
+
+@media (max-width: 380px){
+  .top-actions .btn{
+    padding-left: .5rem;
+    padding-right: .5rem;
+  }
+}
+
+.icon-btn{
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border-radius: 12px;
+}
+.icon-btn i{
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
   </style>
 </head>
 
@@ -330,8 +367,27 @@
           </ul>
         </div>
       {% else %}
-        <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">{{ _('Login') }}</a>
-        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register_admin') }}">{{ _('Register') }}</a>
+        <a class="btn btn-outline-light btn-sm d-none d-sm-inline-flex"
+          href="{{ url_for('auth.login') }}">
+           {{ _('Login') }}
+        </a>
+
+         <a class="btn btn-primary btn-sm d-none d-sm-inline-flex"
+          href="{{ url_for('auth.register_admin') }}">
+           {{ _('Register') }}
+         </a>
+
+
+        <a class="btn btn-outline-light btn-sm d-inline-flex d-sm-none align-items-center justify-content-center icon-btn"
+          href="{{ url_for('auth.login') }}" aria-label="{{ _('Login') }}">
+         <i class="bi bi-box-arrow-in-right"></i>
+        </a>
+
+        <a class="btn btn-primary btn-sm d-inline-flex d-sm-none align-items-center justify-content-center icon-btn"
+          href="{{ url_for('auth.register_admin') }}" aria-label="{{ _('Register') }}">
+          <i class="bi bi-person-plus"></i>
+        </a>
+
       {% endif %}
     </div>
   </div>

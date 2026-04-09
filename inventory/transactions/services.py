@@ -144,7 +144,7 @@ class TransactionService:
             partner_id=partner_id,
             warehouse_id=warehouse_id,
             user_id=user_id,
-            date=datetime.utcnow(),
+            date=datetime.now(),
             note=note,
             locked=True,
         )
@@ -185,7 +185,7 @@ class TransactionService:
             warehouse_id=txn.warehouse_id,
             quantity_remaining=qty,
             unit_cost=unit_cost,
-            received_at=datetime.utcnow(),
+            received_at=datetime.now(),
             transaction_item_id=item.id,
         ))
 
@@ -271,8 +271,7 @@ class TransactionService:
         *, ttype: str, partner_id: int, warehouse_id: int, user_id: int,
         items: list[dict], owner_id: int, note: str | None = None, allow_negative: bool = False
     ) -> dict:
-        # това е публичния вход който се вика от routes
-        # вътре държим db.session.begin за да е атомарно
+
         if ttype not in {"Purchase", "Sale"}:
             return {"error": "Invalid transaction type."}
 
@@ -281,30 +280,47 @@ class TransactionService:
             if pre and pre.get("error"):
                 return {"error": pre["error"]}
 
+        created_items: list[TransactionItem] = []
+
         try:
-            created_items: list[TransactionItem] = []
+            
+            txn = TransactionService._create_header(
+                ttype, partner_id, warehouse_id, user_id, note
+            )
 
-            with db.session.begin():
-                txn = TransactionService._create_header(ttype, partner_id, warehouse_id, user_id, note)
+            for row in items:
+                pid = int(row.get("product_id"))
+                qty = int(row.get("quantity", 0))
+                unit_price = float(row.get("unit_price", 0.0))
 
-                for row in items:
-                    pid = int(row.get("product_id"))
-                    qty = int(row.get("quantity", 0))
-                    unit_price = float(row.get("unit_price", 0.0))
+                if qty <= 0:
+                    raise TransactionError("Quantity must be greater than 0.")
 
-                    if qty <= 0:
-                        raise TransactionError("Quantity must be greater than 0.")
-
-                    if ttype == "Purchase":
-                        created_items.append(TransactionService._purchase_item(txn, owner_id, pid, qty, unit_price))
-                    else:
-                        created_items.append(
-                            TransactionService._sale_item(txn, owner_id, pid, qty, unit_price, allow_negative)
+                if ttype == "Purchase":
+                    created_items.append(
+                        TransactionService._purchase_item(txn, owner_id, pid, qty, unit_price)
+                    )
+                else:
+                    created_items.append(
+                        TransactionService._sale_item(
+                            txn, owner_id, pid, qty, unit_price, allow_negative
                         )
+                    )
 
-            return {"success": True, "transaction": txn, "items": created_items}
+            
+            db.session.commit()
+
+            return {
+                "success": True,
+                "transaction": txn,
+                "items": created_items
+            }
 
         except TransactionError as e:
+            db.session.rollback()
             return {"error": str(e)}
-        except Exception:
+
+        except Exception as e:
+            db.session.rollback()
+            print("UNEXPECTED ERROR:", e)
             return {"error": "Failed to create transaction. Please try again."}

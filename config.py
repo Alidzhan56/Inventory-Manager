@@ -13,6 +13,17 @@ class Config:
     LANGUAGES = ["bg", "en"]
     DEFAULT_LANG = "en"
 
+    MAIL_SERVER = "smtp-relay.brevo.com"
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USE_SSL = False
+    MAIL_USERNAME = os.getenv("BREVO_SMTP_LOGIN")
+    MAIL_PASSWORD = os.getenv("BREVO_SMTP_KEY")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
+    SECURITY_PASSWORD_SALT = "warepulse-email-confirm-2026" 
+
+    
+
 
 class DevelopmentConfig(Config):
     """настройки за локална разработка"""

@@ -1,5 +1,3 @@
-# inventory/routes/users.py
-
 import re
 from datetime import datetime
 
@@ -9,6 +7,7 @@ from werkzeug.security import generate_password_hash
 
 from inventory.extensions import db
 from inventory.models import User, LoginEvent
+from inventory.services.email_service import EmailService
 from inventory.utils.translations import _
 from inventory.utils.permissions import has_permission
 
@@ -96,7 +95,7 @@ def add_user():
         abort(403)
 
     username = (request.form.get("username") or "").strip()
-    email = (request.form.get("email") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
     role = (request.form.get("role") or "").strip()
 
@@ -142,12 +141,21 @@ def add_user():
         # след first login го пращаш да си смени паролата
         force_password_change=True,
         password_changed_at=None,
+        email_verified=False,
+        email_verified_at=None,
+        verification_sent_at=None,
     )
 
     db.session.add(new_user)
     db.session.commit()
 
-    flash(_("User added successfully!"), "success")
+    try:
+        EmailService.send_verification_email(new_user)
+        flash(_("User added successfully! Verification email sent."), "success")
+    except Exception:
+        db.session.rollback()
+        flash(_("User added successfully, but verification email could not be sent."), "warning")
+
     return redirect(url_for("users.users"))
 
 
