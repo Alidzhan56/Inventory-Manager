@@ -7,7 +7,6 @@ from werkzeug.security import generate_password_hash
 
 from inventory.extensions import db
 from inventory.models import User, LoginEvent
-from inventory.services.email_service import EmailService
 from inventory.utils.translations import _
 from inventory.utils.permissions import has_permission
 
@@ -109,6 +108,11 @@ def add_user():
         flash(_("Email, username, and password are required."), "danger")
         return redirect(url_for("users.users"))
 
+    email_pattern = r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"
+    if not re.match(email_pattern, email):
+        flash(_("Please enter a valid email address."), "danger")
+        return redirect(url_for("users.users"))
+
     err = _validate_password_rules(password)
     if err:
         flash(err, "danger")
@@ -137,25 +141,14 @@ def add_user():
         password=hashed_pw,
         role=role,
         created_by_id=owner_id,
-
-        # след first login го пращаш да си смени паролата
         force_password_change=True,
         password_changed_at=None,
-        email_verified=False,
-        email_verified_at=None,
-        verification_sent_at=None,
     )
 
     db.session.add(new_user)
     db.session.commit()
 
-    try:
-        EmailService.send_verification_email(new_user)
-        flash(_("User added successfully! Verification email sent."), "success")
-    except Exception:
-        db.session.rollback()
-        flash(_("User added successfully, but verification email could not be sent."), "warning")
-
+    flash(_("User added successfully."), "success")
     return redirect(url_for("users.users"))
 
 
@@ -296,7 +289,7 @@ def delete_user(id):
         flash(_("You cannot delete your own account."), "warning")
         return redirect(url_for("users.users"))
 
-    # developer може да трие но не и други developer-и
+    # developer може да трие but not other developers
     if (current_user.role or "").strip() == "Developer":
         if (target.role or "").strip() == "Developer":
             flash(_("Developer accounts cannot delete each other."), "warning")

@@ -19,7 +19,7 @@ class User(db.Model, UserMixin):
 
     # бързи данни за последния login
     login_count = db.Column(db.Integer, default=0, nullable=False)
-    last_login_ip = db.Column(db.String(64), nullable=True)
+    last_login_ip = db.Column(db.String(128), nullable=True)
     last_login_country = db.Column(db.String(100), nullable=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
     last_login_user_agent = db.Column(db.String(255), nullable=True)
@@ -27,10 +27,6 @@ class User(db.Model, UserMixin):
     # флаг за user-и създадени от админ които трябва да сменят парола
     force_password_change = db.Column(db.Boolean, default=False, nullable=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
-
-    email_verified = db.Column(db.Boolean, default=False, nullable=False)
-    email_verified_at = db.Column(db.DateTime, nullable=True)
-    verification_sent_at = db.Column(db.DateTime, nullable=True)
 
     # по желание за брандинг ако решиш да го ползваш
     company_name = db.Column(db.String(150), nullable=True)
@@ -64,7 +60,7 @@ class LoginEvent(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
     logged_in_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    ip_address = db.Column(db.String(64), nullable=True)
+    ip_address = db.Column(db.String(128), nullable=True)
     country = db.Column(db.String(100), nullable=True)
     user_agent = db.Column(db.String(255), nullable=True)
 

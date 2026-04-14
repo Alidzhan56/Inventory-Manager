@@ -116,11 +116,6 @@ def change_password():
         db.session.commit()
         db.session.refresh(current_user)
 
-        if not getattr(current_user, "email_verified", False):
-            flash(_("Password changed successfully."), "success")
-            flash(_("Please verify your email address to continue."), "warning")
-            return redirect(url_for("settings.change_password"))
-
         flash(_("Password changed successfully."), "success")
 
         if has_permission(current_user, "settings:manage") and current_user.role != "Developer":
