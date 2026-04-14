@@ -9,18 +9,6 @@
     <div class="text-muted mt-1">{{ _('Update your account password to continue.') }}</div>
   </div>
 
-  {% if current_user.is_authenticated and not current_user.email_verified %}
-  <div class="alert alert-warning">
-    {{ _('Your email address is not verified yet. Please check your email and open the confirmation link.') }}
-  </div>
-
-  <form method="POST" action="{{ url_for('auth.resend_verification_email') }}" class="mb-3">
-    <button type="submit" class="btn btn-outline-warning">
-      {{ _('Send Verification Email Again') }}
-    </button>
-  </form>
-  {% endif %}
-
   <form method="POST" class="card shadow-sm border-0">
     <div class="card-header bg-white fw-semibold d-flex align-items-center">
       <i class="bi bi-shield-lock me-2 text-primary"></i>{{ _('Password Security') }}

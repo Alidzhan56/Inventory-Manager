@@ -2,11 +2,21 @@ import os
 from flask import Flask, g, request, redirect, url_for, flash
 from config import config
 
-from inventory.extensions import db, login_manager, migrate, mail
+from inventory.extensions import db, login_manager, migrate
 from inventory.models import User, AppConfig
 from inventory.utils.translations import set_language, _
 from dotenv import load_dotenv
+import pytz
+
 load_dotenv()
+
+
+def to_local(dt):
+    if not dt:
+        return dt
+    utc = pytz.utc
+    local_tz = pytz.timezone("Europe/Sofia")
+    return utc.localize(dt).astimezone(local_tz)
 
 
 def create_app(config_name="default"):
@@ -19,7 +29,8 @@ def create_app(config_name="default"):
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
-    mail.init_app(app)
+
+    app.jinja_env.filters["localtime"] = to_local
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -40,8 +51,6 @@ def create_app(config_name="default"):
         allowed = {
             "settings.change_password",
             "auth.logout",
-            "auth.verify_email",
-            "auth.resend_verification_email",
             "static",
         }
 
@@ -49,13 +58,6 @@ def create_app(config_name="default"):
             if getattr(current_user, "force_password_change", False):
                 if endpoint not in allowed:
                     flash(_("You must change your password to continue."), "warning")
-                    if not getattr(current_user, "email_verified", False):
-                        flash(_("You must also verify your email address."), "warning")
-                    return redirect(url_for("settings.change_password"))
-
-            if not getattr(current_user, "email_verified", False):
-                if endpoint not in allowed:
-                    flash(_("You must verify your email address to continue."), "warning")
                     return redirect(url_for("settings.change_password"))
 
         if role == "Developer":
@@ -122,7 +124,6 @@ def create_app(config_name="default"):
                     password=generate_password_hash(dev_password),
                     role="Developer",
                     force_password_change=False,
-                    email_verified=True,
                 ))
                 db.session.commit()
 
