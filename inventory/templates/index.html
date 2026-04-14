@@ -559,7 +559,7 @@
               <tbody>
                 {% for t in recent_txns %}
                   <tr>
-                    <td class="text-muted">{{ t.date|localtime|strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td class="text-muted">{{ (t.date|localtime).strftime('%Y-%m-%d %H:%M') if t.date else '-' }}</td>
                     <td>
                       {% if t.type == 'Purchase' %}
                         <span class="badge bg-success">{{ _('Purchase') }}</span>

@@ -330,7 +330,7 @@
         {% for t in txns %}
           {% set txn_total = (t.items | sum(attribute='total_price')) %}
           <tr>
-            <td class="text-muted">{{ t.date|localtime|strftime('%Y-%m-%d %H:%M') }}</td>
+            <td class="text-muted">{{ (t.date|localtime).strftime('%Y-%m-%d %H:%M') if t.date else '-' }}</td>
 
             <td>
               {% if t.type == 'Purchase' %}
