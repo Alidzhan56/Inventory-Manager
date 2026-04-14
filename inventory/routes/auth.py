@@ -10,6 +10,7 @@ from inventory.extensions import db
 from inventory.models import User, LoginEvent
 from inventory.services.email_service import EmailService
 from inventory.utils.email_tokens import verify_email_verification_token
+from inventory.utils.security import hash_ip
 from inventory.utils.translations import _
 
 bp = Blueprint("auth", __name__)
@@ -84,12 +85,13 @@ def login():
 
         try:
             ip = _client_ip()
+            ip_hash = hash_ip(ip)
             ua = (request.headers.get("User-Agent") or "")[:255]
             country = _ip_to_country(ip)
 
             user.login_count = (user.login_count or 0) + 1
             user.last_login_at = datetime.utcnow()
-            user.last_login_ip = ip
+            user.last_login_ip = ip_hash
             user.last_login_country = country
             user.last_login_user_agent = ua
 
@@ -97,7 +99,7 @@ def login():
                 LoginEvent(
                     user_id=user.id,
                     logged_in_at=datetime.utcnow(),
-                    ip_address=ip,
+                    ip_address=ip_hash,
                     country=country,
                     user_agent=ua,
                     success=True,

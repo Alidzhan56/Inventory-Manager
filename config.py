@@ -6,10 +6,10 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "sqlite:///inventory.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # тук качваш снимки на продукти и тн
+    # тук качва снимки на продукти и тн
     UPLOAD_FOLDER = "inventory/static/uploads"
 
-    # езиците които поддържаш в UI
+    # езиците които поддържа в UI
     LANGUAGES = ["bg", "en"]
     DEFAULT_LANG = "en"
 
@@ -20,9 +20,9 @@ class Config:
     MAIL_USERNAME = os.getenv("BREVO_SMTP_LOGIN")
     MAIL_PASSWORD = os.getenv("BREVO_SMTP_KEY")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
-    SECURITY_PASSWORD_SALT = "warepulse-email-confirm-2026" 
+    SECURITY_PASSWORD_SALT = "warepulse-email-confirm-2026"
 
-    
+    IP_HASH_SECRET = os.environ.get("IP_HASH_SECRET") or "warepulse-ip-secret-2026"
 
 
 class DevelopmentConfig(Config):
