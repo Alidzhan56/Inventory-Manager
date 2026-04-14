@@ -1,6 +1,70 @@
 {% extends 'base.html' %}
 {% block content %}
 
+<style>
+  .section-card-header {
+    background: transparent !important;
+  }
+
+  .stock-badge {
+    background: rgba(13, 110, 253, 0.08);
+    color: var(--text);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  body.dark-mode .section-card-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .table thead {
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table thead th {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .table tbody tr {
+    background: transparent !important;
+  }
+
+  body.dark-mode .table tbody td {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .stock-badge {
+    background: rgba(59,130,246,0.16) !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+  }
+
+  body.dark-mode .rounded.border {
+    border-color: rgba(255,255,255,0.12) !important;
+  }
+
+  body.dark-mode .text-muted {
+    color: #94a3b8 !important;
+  }
+
+  body.dark-mode .modal-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .modal-footer {
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .btn-warning {
+    color: #111827 !important;
+  }
+</style>
+
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">{{ _('Products Management') }}</h2>
@@ -8,7 +72,7 @@
 
   <!-- Добавяне на продукт -->
   <div class="card shadow-sm mb-4">
-    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+    <div class="card-header section-card-header fw-semibold d-flex align-items-center">
       <i class="bi bi-plus-circle me-2 text-primary"></i>{{ _('Add New Product') }}
     </div>
     <div class="card-body">
@@ -73,13 +137,13 @@
 
   <!-- Списък с продукти -->
   <div class="card shadow-sm">
-    <div class="card-header bg-white fw-semibold d-flex align-items-center">
+    <div class="card-header section-card-header fw-semibold d-flex align-items-center">
       <i class="bi bi-box-seam me-2 text-secondary"></i>{{ _('Product List') }}
     </div>
 
     <div class="card-body table-responsive">
       <table class="table table-hover align-middle">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th style="width:70px">{{ _('Picture') }}</th>
             <th>{{ _('Name') }}</th>
@@ -122,7 +186,7 @@
               <div class="fw-semibold">{{ _('Total') }}: {{ total_stock or 0 }}</div>
               <div class="mt-1">
                 {% for s in product.stocks %}
-                  <span class="badge bg-light text-dark border me-1 mb-1">
+                  <span class="badge stock-badge me-1 mb-1">
                     {{ s.warehouse.name }}: {{ s.quantity or 0 }}
                   </span>
                 {% endfor %}
@@ -179,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content shadow-lg">
-      <div class="modal-header bg-white">
+      <div class="modal-header">
         <h5 class="modal-title fw-semibold" id="editModalLabel">{{ _('Edit Product') }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Close') }}"></button>
       </div>
@@ -270,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('edit-buy').value = this.dataset.buy;
       document.getElementById('edit-sell').value = this.dataset.sell;
 
-      // нулираме опциите за склад/количество (по желание)
+      // нулирае опциите за склад/количество (по желание)
       document.getElementById('edit-warehouse').value = "";
       document.getElementById('edit-stock-qty').value = "";
 
@@ -278,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Слагаме правилния URL за edit
+  // Слагам правилния URL за edit
   document.getElementById('editForm').addEventListener('submit', function() {
     const id = document.getElementById('edit-id').value;
     this.action = "{{ url_for('products.edit_product', id=0) }}".replace("/0", "/" + id);

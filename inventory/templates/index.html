@@ -4,7 +4,6 @@
 
 {% block content %}
 <style>
-  /* Леко “появяване” на елементите */
   .fade-up {
     opacity: 0;
     transform: translateY(10px);
@@ -63,6 +62,139 @@
 
   .net-positive { color: #198754; }
   .net-negative { color: #dc3545; }
+
+  .section-card-header {
+    background: transparent !important;
+  }
+
+  .insight-card {
+    border: 1px solid rgba(15,23,42,0.06);
+    border-radius: 16px;
+    padding: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.92));
+    box-shadow: var(--shadow);
+    height: 100%;
+  }
+
+  .insight-title {
+    font-size: .82rem;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+
+  .insight-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .insight-sub {
+    color: #64748b;
+    font-size: .9rem;
+    margin-top: 6px;
+  }
+
+  .sales-purchases-track {
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(15,23,42,0.08);
+    display: flex;
+  }
+
+  .sales-purchases-sales {
+    background: linear-gradient(90deg, #0d6efd, #3b82f6);
+    height: 100%;
+  }
+
+  .sales-purchases-purchases {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    height: 100%;
+  }
+
+  .soft-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: .82rem;
+    font-weight: 600;
+    background: rgba(13,110,253,0.08);
+    color: #1d4ed8;
+    border: 1px solid rgba(13,110,253,0.12);
+  }
+
+  .empty-dash {
+    color: #94a3b8;
+  }
+
+  body.dark-mode .mini-kpi,
+  body.dark-mode .insight-card {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .insight-title,
+  body.dark-mode .insight-sub,
+  body.dark-mode .text-muted,
+  body.dark-mode .chip {
+    color: #94a3b8 !important;
+  }
+
+  body.dark-mode .chip {
+    background: rgba(15,23,42,0.55) !important;
+    border-color: rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .insight-value,
+  body.dark-mode h3,
+  body.dark-mode h5,
+  body.dark-mode .fw-bold,
+  body.dark-mode .fw-semibold {
+    color: #e5e7eb !important;
+  }
+
+  body.dark-mode .section-card-header,
+  body.dark-mode .card-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .table thead,
+  body.dark-mode .table-light {
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table thead th {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table tbody td {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: transparent !important;
+  }
+
+  body.dark-mode .soft-badge {
+    background: rgba(59,130,246,0.16) !important;
+    color: #bfdbfe !important;
+    border-color: rgba(255,255,255,0.10) !important;
+  }
+
+  body.dark-mode .sales-purchases-track {
+    background: rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .empty-dash {
+    color: #64748b !important;
+  }
 </style>
 
 <div class="container-fluid">
@@ -223,11 +355,73 @@
     </div>
   </div>
 
+  <div class="row g-3 mt-2 fade-up d4">
+    <div class="col-lg-4 col-md-6">
+      <div class="insight-card">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="insight-title">{{ _('Best product this month') }}</div>
+          <span class="soft-badge"><i class="bi bi-stars"></i>{{ _('Top') }}</span>
+        </div>
+        {% if top_products and top_products|length > 0 %}
+          <div class="insight-value">{{ top_products[0].name }}</div>
+          <div class="insight-sub">
+            {{ _('Qty sold') }}: <strong>{{ top_products[0].qty_sold or 0 }}</strong>
+            ·
+            {{ _('Revenue') }}:
+            <span class="money" data-money="{{ top_products[0].revenue or 0 }}">{{ '%.2f'|format(top_products[0].revenue or 0) }}</span>
+          </div>
+        {% else %}
+          <div class="insight-value empty-dash">—</div>
+          <div class="insight-sub">{{ _('No sales in the last 30 days.') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+      <div class="insight-card">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="insight-title">{{ _('Low stock alert') }}</div>
+          <span class="soft-badge"><i class="bi bi-exclamation-triangle"></i>{{ _('Watch') }}</span>
+        </div>
+        <div class="insight-value">{{ low_stock|length }}</div>
+        <div class="insight-sub">
+          {{ _('Items currently below threshold') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-12">
+      <div class="insight-card">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="insight-title">{{ _('Sales vs Purchases') }}</div>
+          <span class="soft-badge"><i class="bi bi-bar-chart-line"></i>{{ _('This month') }}</span>
+        </div>
+        {% set total_flow = (month_sales_total or 0) + (month_purchases_total or 0) %}
+        {% set sales_width = (((month_sales_total or 0) / total_flow) * 100) if total_flow > 0 else 50 %}
+        {% set purchases_width = (((month_purchases_total or 0) / total_flow) * 100) if total_flow > 0 else 50 %}
+        <div class="sales-purchases-track mt-2 mb-3">
+          <div class="sales-purchases-sales" style="width: {{ sales_width }}%"></div>
+          <div class="sales-purchases-purchases" style="width: {{ purchases_width }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between gap-3 flex-wrap">
+          <div class="insight-sub">
+            <strong>{{ _('Sales') }}</strong>:
+            <span class="money" data-money="{{ month_sales_total or 0 }}">{{ '%.2f'|format(month_sales_total or 0) }}</span>
+          </div>
+          <div class="insight-sub">
+            <strong>{{ _('Purchases') }}</strong>:
+            <span class="money" data-money="{{ month_purchases_total or 0 }}">{{ '%.2f'|format(month_purchases_total or 0) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Графики -->
   <div class="row g-3 mt-2 fade-up d4">
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header section-card-header d-flex justify-content-between align-items-center">
           <div class="fw-semibold">{{ _('Monthly Sales & Purchases') }}</div>
           <span class="text-muted small">{{ _('Last 12 months') }}</span>
         </div>
@@ -239,7 +433,7 @@
 
     <div class="col-lg-4">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header section-card-header d-flex justify-content-between align-items-center">
           <div class="fw-semibold">{{ _('Monthly Transactions Count') }}</div>
           <span class="text-muted small">{{ _('Last 12 months') }}</span>
         </div>
@@ -253,7 +447,7 @@
   <div class="row g-3 mt-0 fade-up d5">
     <div class="col-lg-4">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header section-card-header d-flex justify-content-between align-items-center">
           <div class="fw-semibold">{{ _('Products by Category') }}</div>
           <span class="text-muted small">{{ _('Live') }}</span>
         </div>
@@ -265,7 +459,7 @@
 
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header section-card-header d-flex justify-content-between align-items-center">
           <div class="fw-semibold"><i class="bi bi-stars me-2 text-warning"></i>{{ _('Top Products (last 30 days)') }}</div>
           <span class="text-muted small">{{ _('By quantity sold') }}</span>
         </div>
@@ -273,7 +467,7 @@
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 table-tight">
-              <thead class="table-light">
+              <thead>
                 <tr>
                   <th>{{ _('Product') }}</th>
                   <th class="text-end">{{ _('Qty Sold') }}</th>
@@ -314,13 +508,13 @@
   <div class="row g-3 mt-3">
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <div class="card-header section-card-header fw-semibold d-flex align-items-center">
           <i class="bi bi-exclamation-triangle me-2 text-warning"></i>{{ _('Low Stock') }}
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 table-tight">
-              <thead class="table-light">
+              <thead>
                 <tr>
                   <th>{{ _('Product') }}</th>
                   <th>{{ _('Warehouse') }}</th>
@@ -348,13 +542,13 @@
 
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold d-flex align-items-center">
+        <div class="card-header section-card-header fw-semibold d-flex align-items-center">
           <i class="bi bi-clock-history me-2 text-secondary"></i>{{ _('Latest Transactions') }}
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 table-tight">
-              <thead class="table-light">
+              <thead>
                 <tr>
                   <th>{{ _('Date') }}</th>
                   <th>{{ _('Type') }}</th>
@@ -394,7 +588,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // --------- Данни от backend (Jinja -> JS) ---------
   const currency = {{ (g.app_config.currency if g.app_config and g.app_config.currency else '')|tojson }};
 
   const months = {{ transaction_months|tojson }};
@@ -406,7 +599,11 @@
   const purchaseAmounts = {{ purchase_amounts|tojson }};
   const profitAmounts = {{ profit_amounts|tojson }};
 
-  // --------- Малък helper за “къс” формат (K/M) ---------
+  const isDarkMode = document.body.classList.contains("dark-mode");
+  const chartGridColor = isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)";
+  const chartTickColor = isDarkMode ? "#cbd5e1" : "#334155";
+  const chartLegendColor = isDarkMode ? "#e5e7eb" : "#334155";
+
   const fmtMoney = (n) => {
     const num = Number(n || 0);
     try {
@@ -419,25 +616,47 @@
     }
   };
 
-  // Превръщам всички елементи с data-money в по-компактен текст
   document.querySelectorAll('[data-money]').forEach(el => {
     const raw = el.getAttribute('data-money');
     el.textContent = fmtMoney(raw);
   });
 
-  // Tooltip форматиране (пълна сума с валута)
   const tooltipMoney = (value) => `${currency ? currency + " " : ""}${Number(value || 0).toFixed(2)}`;
 
-  // 1) Линия: Sales / Purchases / Profit
   const moneyCtx = document.getElementById('moneyChart').getContext('2d');
   new Chart(moneyCtx, {
     type: 'line',
     data: {
       labels: months,
       datasets: [
-        { label: "{{ _('Sales') }}", data: saleAmounts, tension: 0.35, fill: true, pointRadius: 2 },
-        { label: "{{ _('Purchases') }}", data: purchaseAmounts, tension: 0.35, fill: true, pointRadius: 2 },
-        { label: "{{ _('Profit') }}", data: profitAmounts, tension: 0.35, fill: false, borderDash: [6, 5], pointRadius: 2 }
+        {
+          label: "{{ _('Sales') }}",
+          data: saleAmounts,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 2,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.16)"
+        },
+        {
+          label: "{{ _('Purchases') }}",
+          data: purchaseAmounts,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 2,
+          borderColor: "#f59e0b",
+          backgroundColor: "rgba(245,158,11,0.16)"
+        },
+        {
+          label: "{{ _('Profit') }}",
+          data: profitAmounts,
+          tension: 0.35,
+          fill: false,
+          borderDash: [6, 5],
+          pointRadius: 2,
+          borderColor: "#22c55e",
+          backgroundColor: "rgba(34,197,94,0.16)"
+        }
       ]
     },
     options: {
@@ -445,7 +664,10 @@
       animation: { duration: 700 },
       interaction: { intersect: false, mode: 'index' },
       plugins: {
-        legend: { position: 'bottom' },
+        legend: {
+          position: 'bottom',
+          labels: { color: chartLegendColor }
+        },
         tooltip: {
           callbacks: {
             label: (ctx) => `${ctx.dataset.label}: ${tooltipMoney(ctx.parsed.y)}`
@@ -453,43 +675,72 @@
         }
       },
       scales: {
-        x: { grid: { display: false } },
+        x: {
+          grid: { display: false },
+          ticks: { color: chartTickColor }
+        },
         y: {
           beginAtZero: true,
-          ticks: { callback: (v) => fmtMoney(v) }
+          ticks: {
+            color: chartTickColor,
+            callback: (v) => fmtMoney(v)
+          },
+          grid: { color: chartGridColor }
         }
       }
     }
   });
 
-  // 2) Bar: брой транзакции (stacked)
   const countCtx = document.getElementById('countChart').getContext('2d');
   new Chart(countCtx, {
     type: 'bar',
     data: {
       labels: months,
       datasets: [
-        { label: "{{ _('Purchases') }}", data: purchaseCounts, borderRadius: 8, maxBarThickness: 22 },
-        { label: "{{ _('Sales') }}", data: saleCounts, borderRadius: 8, maxBarThickness: 22 },
+        {
+          label: "{{ _('Purchases') }}",
+          data: purchaseCounts,
+          borderRadius: 8,
+          maxBarThickness: 22,
+          backgroundColor: "#f59e0b"
+        },
+        {
+          label: "{{ _('Sales') }}",
+          data: saleCounts,
+          borderRadius: 8,
+          maxBarThickness: 22,
+          backgroundColor: "#3b82f6"
+        },
       ]
     },
     options: {
       responsive: true,
       animation: { duration: 700 },
       plugins: {
-        legend: { position: 'bottom' },
+        legend: {
+          position: 'bottom',
+          labels: { color: chartLegendColor }
+        },
         tooltip: {
           callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}` }
         }
       },
       scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { color: chartTickColor }
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { precision: 0, color: chartTickColor },
+          grid: { color: chartGridColor }
+        }
       }
     }
   });
 
-  // 3) Doughnut: продукти по категории
   const categories = {{ product_categories|tojson }};
   const categoryCounts = {{ product_counts|tojson }};
 
@@ -498,14 +749,30 @@
     type: 'doughnut',
     data: {
       labels: categories,
-      datasets: [{ data: categoryCounts, hoverOffset: 8 }]
+      datasets: [{
+        data: categoryCounts,
+        hoverOffset: 8,
+        backgroundColor: [
+          "#3b82f6",
+          "#22c55e",
+          "#f59e0b",
+          "#ef4444",
+          "#8b5cf6",
+          "#06b6d4",
+          "#84cc16",
+          "#f97316"
+        ]
+      }]
     },
     options: {
       responsive: true,
       animation: { duration: 750 },
       cutout: '62%',
       plugins: {
-        legend: { position: 'bottom' },
+        legend: {
+          position: 'bottom',
+          labels: { color: chartLegendColor }
+        },
         tooltip: {
           callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed}` }
         }

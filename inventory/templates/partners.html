@@ -3,6 +3,66 @@
 {% block title %}{{ _('Partners') }} · WarePulse{% endblock %}
 
 {% block content %}
+<style>
+  .section-card-header {
+    background: transparent !important;
+  }
+
+  body.dark-mode .section-card-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .table thead {
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table thead th {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table tbody td {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: transparent !important;
+  }
+
+  body.dark-mode .text-muted {
+    color: #94a3b8 !important;
+  }
+
+  body.dark-mode .modal-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .modal-footer {
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .btn-outline-danger {
+    border-color: rgba(239,68,68,0.5) !important;
+    color: #fca5a5 !important;
+  }
+
+  body.dark-mode .btn-outline-danger:hover {
+    background: rgba(239,68,68,0.12) !important;
+    color: #ffffff !important;
+  }
+
+  body.dark-mode .btn-warning {
+    color: #111827 !important;
+  }
+
+  body.dark-mode .badge.bg-warning {
+    color: #111827 !important;
+  }
+</style>
+
 <div class="container-fluid">
 
   <!-- Заглавие -->
@@ -28,7 +88,7 @@
   <!-- Добавяне на партньор (само за Admin/Owner и Warehouse Manager) -->
   {% if current_user.role in ['Admin / Owner', 'Warehouse Manager'] %}
   <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-white fw-semibold">
+    <div class="card-header section-card-header fw-semibold">
       <i class="bi bi-person-plus me-2 text-primary"></i>{{ _('Add Partner') }}
     </div>
     <div class="card-body">
@@ -59,7 +119,7 @@
 
   <!-- Търсене и филтри -->
   <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-white fw-semibold">
+    <div class="card-header section-card-header fw-semibold">
       <i class="bi bi-funnel me-2"></i>{{ _('Search & Filter') }}
     </div>
     <div class="card-body">
@@ -91,14 +151,14 @@
 
   <!-- Таблица с партньори -->
   <div class="card shadow-sm">
-    <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+    <div class="card-header section-card-header fw-semibold d-flex justify-content-between">
       <div><i class="bi bi-people me-2"></i>{{ _('Partners') }}</div>
       <div class="text-muted small">{{ partners|length }} {{ _('total') }}</div>
     </div>
 
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th>{{ _('Name') }}</th>
             <th>{{ _('Type') }}</th>

@@ -4,6 +4,60 @@
 
 {% block content %}
 
+<style>
+  .section-card-header {
+    background: transparent !important;
+  }
+
+  .stock-badge {
+    background: rgba(13, 110, 253, 0.08);
+    color: var(--text);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  body.dark-mode .section-card-header {
+    background: #0f1b35 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+  }
+
+  body.dark-mode .table thead {
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table thead th {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: #132347 !important;
+  }
+
+  body.dark-mode .table tbody td {
+    color: #e5e7eb !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    background: transparent !important;
+  }
+
+  body.dark-mode .stock-badge {
+    background: rgba(59,130,246,0.16) !important;
+    color: #e5e7eb !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+  }
+
+  body.dark-mode .text-muted {
+    color: #94a3b8 !important;
+  }
+
+  body.dark-mode .btn-outline-danger {
+    border-color: rgba(239,68,68,0.5) !important;
+    color: #fca5a5 !important;
+  }
+
+  body.dark-mode .btn-outline-danger:hover {
+    background: rgba(239,68,68,0.12) !important;
+    color: #ffffff !important;
+  }
+</style>
+
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
   <div>
     <h3 class="fw-bold mb-0">{{ _('Warehouses') }}</h3>
@@ -13,7 +67,7 @@
 
 <!-- Add Warehouse -->
 <div class="card mb-4">
-  <div class="card-header bg-white fw-semibold d-flex align-items-center">
+  <div class="card-header section-card-header fw-semibold d-flex align-items-center">
     <i class="bi bi-plus-circle me-2 text-primary"></i>{{ _('Add New Warehouse') }}
   </div>
   <div class="card-body">
@@ -37,13 +91,13 @@
 
 <!-- Warehouses list -->
 <div class="card">
-  <div class="card-header bg-white fw-semibold d-flex align-items-center">
+  <div class="card-header section-card-header fw-semibold d-flex align-items-center">
     <i class="bi bi-building me-2 text-secondary"></i>{{ _('Existing Warehouses') }}
   </div>
 
   <div class="card-body table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
+      <thead>
         <tr>
           <th style="width: 60px;">{{ _('#') }}</th>
           <th>{{ _('Name') }}</th>
@@ -69,10 +123,10 @@
 
           <td>
             <div class="d-flex flex-wrap gap-2">
-              <span class="badge bg-light text-dark border">
+              <span class="badge stock-badge">
                 {{ _('Units') }}: <span class="fw-semibold">{{ total_units }}</span>
               </span>
-              <span class="badge bg-light text-dark border">
+              <span class="badge stock-badge">
                 {{ _('Products') }}: <span class="fw-semibold">{{ prod_count }}</span>
               </span>
             </div>
